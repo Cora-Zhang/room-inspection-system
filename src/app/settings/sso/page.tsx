@@ -17,14 +17,19 @@ interface SSOConfig {
 }
 
 interface OAuth2ConfigForm {
-  appId?: string;
-  appSecret?: string;
+  // OAuth2.0 单点认证参数
   clientId?: string;
   clientSecret?: string;
   authorizationUrl: string;
   tokenUrl: string;
   userInfoUrl: string;
   scope?: string;
+  redirectUri?: string;
+  // 用户数据同步参数
+  appId?: string;
+  appSecret?: string;
+  callbackUrl?: string; // 接收用户数据的回调地址
+  // 其他配置
   userMapping?: {
     userId?: string;
     username?: string;
@@ -172,7 +177,9 @@ export default function SSOConfigPage() {
         {/* 标题 */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">SSO配置管理</h1>
-          <p className="text-gray-400">配置单点登录认证协议，支持OAuth2.0、SAML、CAS等</p>
+          <p className="text-gray-400">
+            配置单点登录认证协议，支持OAuth2.0、SAML、CAS等。同时支持配置用户数据同步参数，接收统一身份认证平台的数据推送。
+          </p>
         </div>
 
         {/* 操作栏 */}
@@ -342,125 +349,238 @@ export default function SSOConfigPage() {
 
               {/* OAuth2.0配置 */}
               {formData.type === 'oauth2' && (
-                <div className="space-y-4 border-t border-gray-700 pt-6">
-                  <h3 className="text-lg font-semibold text-cyan-400">OAuth2.0配置</h3>
+                <div className="space-y-6">
+                  {/* OAuth2.0 单点认证参数 */}
+                  <div className="border-t border-gray-700 pt-6">
+                    <h3 className="text-lg font-semibold text-cyan-400 mb-4">
+                      OAuth2.0 单点认证配置
+                    </h3>
+                    <p className="text-sm text-gray-400 mb-4">
+                      用于用户通过单点登录时的身份认证
+                    </p>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Client ID <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.config.clientId || ''}
+                          onChange={(e) => handleConfigChange('clientId', e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
+                          placeholder="OAuth2.0 客户端ID"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Client Secret <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          value={formData.config.clientSecret || ''}
+                          onChange={(e) => handleConfigChange('clientSecret', e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
+                          placeholder="OAuth2.0 客户端密钥"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        App ID / Client ID
+                        授权地址 (Authorization URL) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.config.authorizationUrl || ''}
+                        onChange={(e) => handleConfigChange('authorizationUrl', e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
+                        placeholder="https://sso.example.com/oauth/authorize"
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        获取Token地址 (Token URL) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.config.tokenUrl || ''}
+                        onChange={(e) => handleConfigChange('tokenUrl', e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
+                        placeholder="https://sso.example.com/oauth/token"
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        获取用户信息地址 (User Info URL) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="url"
+                        value={formData.config.userInfoUrl || ''}
+                        onChange={(e) => handleConfigChange('userInfoUrl', e.target.value)}
+                        className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
+                        placeholder="https://sso.example.com/oauth/userinfo"
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        回调地址 (Redirect URI)
                       </label>
                       <input
                         type="text"
-                        value={formData.config.appId || formData.config.clientId || ''}
-                        onChange={(e) => handleConfigChange('appId', e.target.value)}
+                        value={formData.config.redirectUri || ''}
+                        onChange={(e) => handleConfigChange('redirectUri', e.target.value)}
                         className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
-                        placeholder="应用ID或客户端ID"
+                        placeholder={`${window.location.origin}/auth/callback`}
+                        readOnly
                       />
                     </div>
-                    <div>
+
+                    <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-300 mb-2">
-                        App Secret / Client Secret
+                        Scope
                       </label>
                       <input
-                        type="password"
-                        value={formData.config.appSecret || formData.config.clientSecret || ''}
-                        onChange={(e) => handleConfigChange('appSecret', e.target.value)}
+                        type="text"
+                        value={formData.config.scope || ''}
+                        onChange={(e) => handleConfigChange('scope', e.target.value)}
                         className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
-                        placeholder="应用密钥或客户端密钥"
+                        placeholder="openid profile email"
                       />
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      授权地址 (Authorization URL) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.config.authorizationUrl || ''}
-                      onChange={(e) => handleConfigChange('authorizationUrl', e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
-                      placeholder="https://sso.example.com/oauth/authorize"
-                    />
-                  </div>
+                  {/* 用户数据同步参数 */}
+                  <div className="border-t border-gray-700 pt-6">
+                    <h3 className="text-lg font-semibold text-purple-400 mb-4">
+                      用户数据同步配置
+                    </h3>
+                    <p className="text-sm text-gray-400 mb-4">
+                      用于接收统一身份认证平台推送的用户和组织数据
+                    </p>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      获取Token地址 (Token URL) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.config.tokenUrl || ''}
-                      onChange={(e) => handleConfigChange('tokenUrl', e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
-                      placeholder="https://sso.example.com/oauth/token"
-                    />
-                  </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          App ID <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.config.appId || ''}
+                          onChange={(e) => handleConfigChange('appId', e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-white"
+                          placeholder="数据同步应用ID"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          App Secret <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          value={formData.config.appSecret || ''}
+                          onChange={(e) => handleConfigChange('appSecret', e.target.value)}
+                          className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-white"
+                          placeholder="数据同步应用密钥"
+                        />
+                      </div>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      获取用户信息地址 (User Info URL) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="url"
-                      value={formData.config.userInfoUrl || ''}
-                      onChange={(e) => handleConfigChange('userInfoUrl', e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
-                      placeholder="https://sso.example.com/oauth/userinfo"
-                    />
-                  </div>
+                    <div className="mt-4">
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        数据回调地址 (Callback URL)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={formData.config.callbackUrl || `${window.location.origin}/api/sync/callback`}
+                          onChange={(e) => handleConfigChange('callbackUrl', e.target.value)}
+                          className="flex-1 px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 text-white"
+                          placeholder={`${window.location.origin}/api/sync/callback`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${window.location.origin}/api/sync/callback`);
+                            alert('已复制到剪贴板');
+                          }}
+                          className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                        >
+                          复制
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-2">
+                        请将此地址配置到统一身份认证平台，用于接收用户数据推送
+                      </p>
+                    </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Scope
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.config.scope || ''}
-                      onChange={(e) => handleConfigChange('scope', e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
-                      placeholder="openid profile email"
-                    />
+                    <div className="mt-4 p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                      <h4 className="text-sm font-medium text-blue-400 mb-2">数据同步说明</h4>
+                      <ul className="text-xs text-gray-400 space-y-1 list-disc list-inside">
+                        <li>统一身份认证平台会主动推送用户和组织数据到回调地址</li>
+                        <li>数据同步使用 App ID 和 App Secret 进行签名验证</li>
+                        <li>支持全量和增量同步两种模式</li>
+                        <li>同步日志可在"系统管理 > 同步管理"中查看</li>
+                      </ul>
+                    </div>
                   </div>
 
                   {/* 额外参数 */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      额外参数 (API Key等)
-                    </label>
-                    <div className="space-y-2">
-                      {Object.entries(formData.config.extraParams || {}).map(([key, value]) => (
-                        <div key={key} className="flex gap-2">
-                          <input
-                            type="text"
-                            value={key}
-                            readOnly
-                            className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-gray-400"
-                          />
-                          <input
-                            type="text"
-                            value={value as string}
-                            onChange={(e) => {
-                              const newParams = { ...formData.config.extraParams };
-                              newParams[key] = e.target.value;
-                              handleConfigChange('extraParams', newParams);
-                            }}
-                            className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white"
-                          />
-                        </div>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newParams = { ...formData.config.extraParams };
-                          newParams[`param_${Date.now()}`] = '';
-                          handleConfigChange('extraParams', newParams);
-                        }}
-                        className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                      >
-                        + 添加参数
-                      </button>
+                  <div className="border-t border-gray-700 pt-6">
+                    <h3 className="text-lg font-semibold text-gray-400 mb-4">
+                      额外配置
+                    </h3>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        额外参数 (API Key等)
+                      </label>
+                      <div className="space-y-2">
+                        {Object.entries(formData.config.extraParams || {}).map(([key, value]) => (
+                          <div key={key} className="flex gap-2">
+                            <input
+                              type="text"
+                              value={key}
+                              readOnly
+                              className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-gray-400"
+                            />
+                            <input
+                              type="text"
+                              value={value as string}
+                              onChange={(e) => {
+                                const newParams = { ...formData.config.extraParams };
+                                newParams[key] = e.target.value;
+                                handleConfigChange('extraParams', newParams);
+                              }}
+                              className="flex-1 px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg text-white"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newParams = { ...formData.config.extraParams };
+                                delete newParams[key];
+                                handleConfigChange('extraParams', newParams);
+                              }}
+                              className="px-4 py-2 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30 transition-colors"
+                            >
+                              删除
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newParams = { ...formData.config.extraParams };
+                            newParams[`param_${Date.now()}`] = '';
+                            handleConfigChange('extraParams', newParams);
+                          }}
+                          className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                        >
+                          + 添加参数
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
