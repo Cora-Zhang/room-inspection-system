@@ -523,7 +523,7 @@ export default function SSOConfigPage() {
                         <li>统一身份认证平台会主动推送用户和组织数据到回调地址</li>
                         <li>数据同步使用 App ID 和 App Secret 进行签名验证</li>
                         <li>支持全量和增量同步两种模式</li>
-                        <li>同步日志可在"系统管理 > 同步管理"中查看</li>
+                        <li>同步日志可在"系统管理 &gt; 同步管理"中查看</li>
                       </ul>
                     </div>
                   </div>

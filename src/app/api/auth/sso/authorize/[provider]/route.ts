@@ -5,9 +5,9 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
-  const { provider } = params;
+  const { provider } = await params;
 
   // 模拟生成授权URL
   // 实际实现中，这里应该根据provider配置生成OAuth2.0/SAML授权URL
