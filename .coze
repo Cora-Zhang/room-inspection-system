@@ -1,13 +1,17 @@
 [project]
-entrypoint = "server.js"
+entrypoint = "index.html"
 requires = ["nodejs-24"]
 
 [dev]
-build = ["bash", ".cozeproj/scripts/dev_build.sh"]
-run = ["bash", ".cozeproj/scripts/dev_run.sh"]
-deps = ["git"] # -> apt install git
+build = ["bash", "-c", "cd vue-frontend && pnpm install"]
+run = ["bash", "-c", "cd vue-frontend && pnpm dev --port 5000 --host"]
 
 [deploy]
-build = ["bash", ".cozeproj/scripts/deploy_build.sh"]
-run = ["bash", ".cozeproj/scripts/deploy_run.sh"]
-deps = ["git"] # -> apt install git
+build = ["bash", "-c", "cd vue-frontend && pnpm install && pnpm build"]
+run = ["bash", "-c", "cd vue-frontend && pnpm preview --port 5000 --host"]
+deps = ["git"]
+
+[info]
+name = "机房巡检系统"
+description = "基于Java8 + Vue3 + MySQL5.7的机房巡检系统，支持OAuth2.0 SSO、多渠道告警、监控协议对接、门禁系统对接等企业级功能"
+version = "2.0.0"

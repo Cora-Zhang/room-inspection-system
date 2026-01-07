@@ -1,0 +1,170 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  tomcat:
+    uri-encoding: UTF-8
+    max-threads: 200
+    max-connections: 10000
+
+spring:
+  application:
+    name: room-inspection-backend
+
+  # 数据源配置
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/room_inspection?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+    username: root
+    password: 123456
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+      filters: stat,wall
+      web-stat-filter:
+        enabled: true
+        url-pattern: /*
+        exclusions: "*.js,*.gif,*.jpg,*.png,*.css,*.ico,/druid/*"
+      stat-view-servlet:
+        enabled: true
+        url-pattern: /druid/*
+        reset-enable: false
+        login-username: admin
+        login-password: admin
+
+  # Redis配置
+  redis:
+    host: localhost
+    port: 6379
+    password:
+    database: 0
+    lettuce:
+      pool:
+        max-active: 20
+        max-wait: -1ms
+        max-idle: 10
+        min-idle: 5
+    timeout: 5000ms
+
+  # Cache配置
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000
+
+  # OAuth2 SSO配置
+  security:
+    oauth2:
+      client:
+        registration:
+          # 这里配置多个SSO客户端
+          sso1:
+            client-id: ${SSO_CLIENT_ID:your-client-id}
+            client-secret: ${SSO_CLIENT_SECRET:your-client-secret}
+            client-authentication-method: client_secret_post
+            authorization-grant-type: authorization_code
+            redirect-uri: ${SSO_REDIRECT_URI:http://localhost:8080/api/auth/callback/sso1}
+            scope: openid,profile,email
+        provider:
+          sso1:
+            authorization-uri: ${SSO_AUTH_URI:https://sso.example.com/oauth/authorize}
+            token-uri: ${SSO_TOKEN_URI:https://sso.example.com/oauth/token}
+            user-info-uri: ${SSO_USER_INFO_URI:https://sso.example.com/api/userinfo}
+            jwk-set-uri: ${SSO_JWK_URI:https://sso.example.com/.well-known/jwks.json}
+            user-name-attribute: sub
+
+# MyBatis配置
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.roominspection.backend.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    cache-enabled: false
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.roominspection: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{50} - %msg%n"
+  file:
+    name: logs/room-inspection.log
+    max-size: 10MB
+    max-history: 30
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-at-least-256-bits-long-for-hs256-algorithm}
+  expiration: ${JWT_EXPIRATION:86400000} # 24小时
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000} # 7天
+
+# 文件上传配置
+file:
+  upload-path: ${FILE_UPLOAD_PATH:/tmp/uploads}
+  max-size: 10MB
+
+# 监控协议配置
+monitor:
+  snmp:
+    enabled: true
+    timeout: 5000
+    retries: 3
+  modbus:
+    enabled: true
+    timeout: 5000
+    retries: 3
+  bms:
+    enabled: true
+    api-url: ${BMS_API_URL:http://bms.example.com/api}
+    api-key: ${BMS_API_KEY:your-bms-api-key}
+
+# 门禁系统配置
+access-control:
+  hikvision:
+    enabled: true
+    api-url: ${HIKVISION_API_URL:http://hikvision.example.com/api}
+    username: ${HIKVISION_USERNAME:admin}
+    password: ${HIKVISION_PASSWORD:password}
+  dahua:
+    enabled: true
+    api-url: ${DAHUA_API_URL:http://dahua.example.com/api}
+    username: ${DAHUA_USERNAME:admin}
+    password: ${DAHUA_PASSWORD:password}
+
+# 告警配置
+alert:
+  dingtalk:
+    enabled: true
+    webhook: ${DINGTALK_WEBHOOK:https://oapi.dingtalk.com/robot/send}
+    secret: ${DINGTALK_SECRET:your-dingtalk-secret}
+  email:
+    enabled: true
+    host: ${EMAIL_HOST:smtp.example.com}
+    port: ${EMAIL_PORT:465}
+    username: ${EMAIL_USERNAME:noreply@example.com}
+    password: ${EMAIL_PASSWORD:your-email-password}
+    from: ${EMAIL_FROM:noreply@example.com}
+  sms:
+    enabled: true
+    provider: ${SMS_PROVIDER:aliyun}
+    access-key: ${SMS_ACCESS_KEY:your-access-key}
+    secret-key: ${SMS_SECRET_KEY:your-secret-key}
+    sign-name: ${SMS_SIGN_NAME:机房巡检}
+    template-code: ${SMS_TEMPLATE_CODE:your-template-code}
