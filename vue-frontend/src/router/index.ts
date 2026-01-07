@@ -147,6 +147,26 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'environment-monitoring',
+        name: 'EnvironmentMonitoring',
+        component: () => import('@/views/EnvironmentMonitoring.vue'),
+        meta: {
+          title: '环境监控',
+          icon: 'Monitor',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'energy-efficiency',
+        name: 'EnergyEfficiency',
+        component: () => import('@/views/EnergyEfficiency.vue'),
+        meta: {
+          title: '能效优化',
+          icon: 'TrendCharts',
+          requiresAuth: true
+        }
+      },
+      {
         path: 'system',
         name: 'System',
         meta: {

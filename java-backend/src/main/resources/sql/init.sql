@@ -984,3 +984,141 @@ INSERT INTO `power_system` (`device_code`, `device_name`, `device_type`, `brand`
 ('PWR-PDU-001', '机房A PDU-01', 'pdu', 'Schneider', 'AP8868', 1, '机房A-101', 'A区第一排', 22.00, 'modbus', '192.168.1.101', 502, 60, 'online'),
 ('PWR-PDU-002', '机房A PDU-02', 'pdu', 'Schneider', 'AP8868', 1, '机房A-101', 'A区第二排', 22.00, 'modbus', '192.168.1.102', 502, 60, 'online'),
 ('PWR-MAIN-001', '市电输入总开关', 'main_power', 'Schneider', 'MasterPact NT', 1, '机房A-101', '配电间', 630.00, 'modbus', '192.168.1.103', 502, 60, 'online');
+
+-- ============================================
+-- 环境系统监控与能效优化模块
+-- ============================================
+
+-- 环境传感器表
+CREATE TABLE IF NOT EXISTS `environment_sensor` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `sensor_name` varchar(100) NOT NULL COMMENT '传感器名称',
+  `sensor_type` varchar(20) NOT NULL COMMENT '传感器类型（TEMPERATURE-温湿度、WATER-漏水、SMOKE-烟感）',
+  `device_id` bigint DEFAULT NULL COMMENT '设备ID（关联设备管理表）',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID（关联机房管理表）',
+  `location` varchar(200) DEFAULT NULL COMMENT '安装位置描述',
+  `coordinate_x` double DEFAULT NULL COMMENT '坐标X（用于热力图绘制）',
+  `coordinate_y` double DEFAULT NULL COMMENT '坐标Y（用于热力图绘制）',
+  `ip_address` varchar(50) DEFAULT NULL COMMENT '传感器IP地址',
+  `port` int DEFAULT NULL COMMENT '传感器端口',
+  `protocol_type` varchar(20) DEFAULT NULL COMMENT '协议类型（MODBUS、SNMP、BACNET、HTTP）',
+  `register_address` int DEFAULT NULL COMMENT '寄存器地址（Modbus）',
+  `snmp_oid` varchar(200) DEFAULT NULL COMMENT 'SNMP OID',
+  `collect_interval` int DEFAULT 300 COMMENT '采集频率（秒）',
+  `temp_threshold_high` double DEFAULT NULL COMMENT '温度阈值上限（℃）',
+  `temp_threshold_low` double DEFAULT NULL COMMENT '温度阈值下限（℃）',
+  `humidity_threshold_high` double DEFAULT NULL COMMENT '湿度阈值上限（%）',
+  `humidity_threshold_low` double DEFAULT NULL COMMENT '湿度阈值下限（%）',
+  `status` varchar(20) DEFAULT 'NORMAL' COMMENT '状态（NORMAL-正常、ALARM-告警、OFFLINE-离线）',
+  `last_collect_time` datetime DEFAULT NULL COMMENT '最后采集时间',
+  `remark` text DEFAULT NULL COMMENT '备注信息',
+  `created_by` bigint DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_by` bigint DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除标志',
+  PRIMARY KEY (`id`),
+  KEY `idx_sensor_type` (`sensor_type`),
+  KEY `idx_device_id` (`device_id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='环境传感器表';
+
+-- 环境数据表
+CREATE TABLE IF NOT EXISTS `environment_data` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `sensor_id` bigint DEFAULT NULL COMMENT '传感器ID',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `data_type` varchar(20) NOT NULL COMMENT '数据类型（TEMPERATURE-温度、HUMIDITY-湿度、WATER-漏水、SMOKE-烟感）',
+  `value` double DEFAULT NULL COMMENT '数值',
+  `unit` varchar(20) DEFAULT NULL COMMENT '单位（℃、%、无单位）',
+  `is_alarm` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否告警（0-正常、1-告警）',
+  `alarm_level` varchar(20) DEFAULT NULL COMMENT '告警级别（INFO-信息、WARNING-警告、CRITICAL-严重）',
+  `alarm_message` varchar(500) DEFAULT NULL COMMENT '告警信息',
+  `collect_time` datetime NOT NULL COMMENT '采集时间',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_sensor_id` (`sensor_id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_data_type` (`data_type`),
+  KEY `idx_collect_time` (`collect_time`),
+  KEY `idx_is_alarm` (`is_alarm`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='环境数据表';
+
+-- 热力图数据表
+CREATE TABLE IF NOT EXISTS `heatmap_data` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `heatmap_type` varchar(20) NOT NULL COMMENT '热力图类型（TEMPERATURE-温度热力图、HUMIDITY-湿度热力图）',
+  `coordinate_x` double DEFAULT NULL COMMENT '坐标X',
+  `coordinate_y` double DEFAULT NULL COMMENT '坐标Y',
+  `temperature` double DEFAULT NULL COMMENT '温度值（热力图类型为温度时）',
+  `humidity` double DEFAULT NULL COMMENT '湿度值（热力图类型为湿度时）',
+  `heat_value` double DEFAULT NULL COMMENT '热力值（0-1之间，用于热力图渲染）',
+  `is_abnormal` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否异常区域（0-正常、1-异常）',
+  `abnormal_type` varchar(50) DEFAULT NULL COMMENT '异常类型（HIGH_TEMP-高温、LOW_TEMP-低温、HIGH_HUMIDITY-高湿、LOW_HUMIDITY-低湿）',
+  `data_time` datetime NOT NULL COMMENT '数据时间',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_heatmap_type` (`heatmap_type`),
+  KEY `idx_data_time` (`data_time`),
+  KEY `idx_is_abnormal` (`is_abnormal`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='热力图数据表';
+
+-- 能效优化工单表
+CREATE TABLE IF NOT EXISTS `energy_efficiency_order` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `order_no` varchar(50) NOT NULL COMMENT '工单编号',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `order_type` varchar(50) NOT NULL COMMENT '工单类型（HIGH_TEMP-高温检查、HUMIDITY_RISE-湿度排查、COLD_AIR-冷通道检查、AIR_DUCT-风道检查）',
+  `title` varchar(200) NOT NULL COMMENT '工单标题',
+  `description` text DEFAULT NULL COMMENT '工单描述',
+  `trigger_condition` varchar(200) DEFAULT NULL COMMENT '触发条件（持续高温、湿度缓升等）',
+  `trigger_value` double DEFAULT NULL COMMENT '触发值',
+  `trigger_time` datetime NOT NULL COMMENT '触发时间',
+  `abnormal_area_id` bigint DEFAULT NULL COMMENT '异常区域ID',
+  `abnormal_area` varchar(200) DEFAULT NULL COMMENT '异常区域描述',
+  `priority` varchar(20) DEFAULT 'MEDIUM' COMMENT '优先级（LOW-低、MEDIUM-中、HIGH-高、URGENT-紧急）',
+  `status` varchar(20) DEFAULT 'PENDING' COMMENT '工单状态（PENDING-待处理、PROCESSING-处理中、COMPLETED-已完成、CLOSED-已关闭）',
+  `assignee_id` bigint DEFAULT NULL COMMENT '负责人ID',
+  `assignee_name` varchar(50) DEFAULT NULL COMMENT '负责人姓名',
+  `assign_time` datetime DEFAULT NULL COMMENT '指派时间',
+  `plan_complete_time` datetime DEFAULT NULL COMMENT '计划完成时间',
+  `actual_complete_time` datetime DEFAULT NULL COMMENT '实际完成时间',
+  `result` text DEFAULT NULL COMMENT '处理结果',
+  `suggestion` text DEFAULT NULL COMMENT '处理建议',
+  `attachment_id` bigint DEFAULT NULL COMMENT '附件ID',
+  `remark` text DEFAULT NULL COMMENT '备注',
+  `created_by` bigint DEFAULT NULL COMMENT '创建人',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_by` bigint DEFAULT NULL COMMENT '更新人',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除标志',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_no` (`order_no`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_order_type` (`order_type`),
+  KEY `idx_status` (`status`),
+  KEY `idx_priority` (`priority`),
+  KEY `idx_trigger_time` (`trigger_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='能效优化工单表';
+
+-- 插入示例环境传感器
+INSERT INTO `environment_sensor` (`sensor_name`, `sensor_type`, `device_id`, `room_id`, `location`, `coordinate_x`, `coordinate_y`, `ip_address`, `port`, `protocol_type`, `collect_interval`, `temp_threshold_high`, `temp_threshold_low`, `humidity_threshold_high`, `humidity_threshold_low`, `status`) VALUES
+('机房A-01温湿度传感器', 'TEMPERATURE', 1, 1, 'A区第一排', 100.0, 150.0, '192.168.1.200', 502, 'MODBUS', 60, 28.0, 18.0, 70.0, 40.0, 'NORMAL'),
+('机房A-02温湿度传感器', 'TEMPERATURE', 1, 1, 'A区第二排', 200.0, 150.0, '192.168.1.201', 502, 'MODBUS', 60, 28.0, 18.0, 70.0, 40.0, 'NORMAL'),
+('机房A-03温湿度传感器', 'TEMPERATURE', 1, 1, 'B区第一排', 100.0, 300.0, '192.168.1.202', 502, 'MODBUS', 60, 28.0, 18.0, 70.0, 40.0, 'NORMAL'),
+('机房A-漏水检测器', 'WATER', 1, 1, 'A区空调下方', 150.0, 100.0, '192.168.1.210', 502, 'MODBUS', 30, NULL, NULL, NULL, NULL, 'NORMAL'),
+('机房A-烟感传感器', 'SMOKE', 1, 1, '机房A主入口', 50.0, 50.0, '192.168.1.220', 502, 'MODBUS', 30, NULL, NULL, NULL, NULL, 'NORMAL');
+
+-- 插入示例环境数据
+INSERT INTO `environment_data` (`sensor_id`, `room_id`, `data_type`, `value`, `unit`, `is_alarm`, `alarm_level`, `collect_time`) VALUES
+(1, 1, 'TEMPERATURE', 22.5, '℃', 0, NULL, NOW()),
+(1, 1, 'HUMIDITY', 55.0, '%', 0, NULL, NOW()),
+(2, 1, 'TEMPERATURE', 23.0, '℃', 0, NULL, NOW()),
+(2, 1, 'HUMIDITY', 56.0, '%', 0, NULL, NOW()),
+(3, 1, 'TEMPERATURE', 21.5, '℃', 0, NULL, NOW()),
+(3, 1, 'HUMIDITY', 54.0, '%', 0, NULL, NOW()),
+(4, 1, 'WATER', 0.0, '', 0, NULL, NOW()),
+(5, 1, 'SMOKE', 0.0, '', 0, NULL, NOW());
