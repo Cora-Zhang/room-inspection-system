@@ -9,13 +9,17 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    setMounted(true);
     const timer = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+    };
   }, []);
 
   const formatTime = (date: Date) => {
@@ -90,17 +94,21 @@ export default function LoginPage() {
 
       {/* 时间显示 */}
       <div className="absolute top-8 right-8 text-right">
-        <div className="text-4xl font-mono font-bold text-cyan-400 mb-2">
-          {formatTime(currentTime)}
-        </div>
-        <div className="text-sm text-gray-400">
-          {currentTime.toLocaleDateString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            weekday: 'long',
-          })}
-        </div>
+        {mounted && (
+          <div className="text-4xl font-mono font-bold text-cyan-400 mb-2">
+            {formatTime(currentTime)}
+          </div>
+        )}
+        {mounted && (
+          <div className="text-sm text-gray-400">
+            {currentTime.toLocaleDateString('zh-CN', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              weekday: 'long',
+            })}
+          </div>
+        )}
       </div>
 
       {/* 登录卡片 */}
