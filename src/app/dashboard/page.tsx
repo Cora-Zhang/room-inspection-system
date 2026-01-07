@@ -1,10 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import MainLayout from '@/components/Layout/MainLayout';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardPage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mounted, setMounted] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const dashboardRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
@@ -12,6 +18,31 @@ export default function DashboardPage() {
       setCurrentTime(new Date());
     }, 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  const toggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        setIsFullscreen(true);
+      } else {
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+      }
+    } catch (error) {
+      console.error('全屏切换失败:', error);
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
   }, []);
 
   const formatTime = (date: Date) => {
@@ -93,50 +124,86 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="min-h-screen">
-      {/* 顶部标题栏 */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-2">数据中心看板</h1>
-            <p className="text-gray-400 text-sm">实时监控机房运行状态</p>
-          </div>
-          <div className="flex items-center gap-6">
-            <div className="text-right">
-              {mounted && (
-                <div className="text-4xl font-mono font-bold text-cyan-400 mb-1">
-                  {formatTime(currentTime)}
-                </div>
-              )}
-              {mounted && (
-                <div className="text-xs text-gray-400">
-                  {currentTime.toLocaleDateString('zh-CN', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    weekday: 'long',
-                  })}
-                </div>
-              )}
+    <MainLayout>
+      <div ref={dashboardRef} className="min-h-screen">
+        {/* 顶部标题栏 */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">数据中心看板</h1>
+              <p className="text-gray-400 text-sm">实时监控机房运行状态</p>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/30">
-              <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]"></div>
-              <span className="text-green-400 text-sm font-medium">系统运行正常</span>
+            <div className="flex items-center gap-4">
+              {/* 编辑模式按钮 */}
+              <button
+                onClick={() => setIsEditMode(!isEditMode)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  isEditMode
+                    ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+                    : 'bg-gray-700/30 text-gray-400 hover:bg-gray-700/50'
+                }`}
+              >
+                {isEditMode ? '退出编辑' : '编辑布局'}
+              </button>
+              {/* 全屏按钮 */}
+              <button
+                onClick={toggleFullscreen}
+                className="px-4 py-2 rounded-lg bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 text-sm font-medium hover:bg-cyan-500/30 transition-colors"
+              >
+                {isFullscreen ? '退出全屏' : '全屏显示'}
+              </button>
+              <div className="text-right">
+                {mounted && (
+                  <div className="text-4xl font-mono font-bold text-cyan-400 mb-1">
+                    {formatTime(currentTime)}
+                  </div>
+                )}
+                {mounted && (
+                  <div className="text-xs text-gray-400">
+                    {currentTime.toLocaleDateString('zh-CN', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      weekday: 'long',
+                    })}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-500/10 border border-green-500/30">
+                <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]"></div>
+                <span className="text-green-400 text-sm font-medium">系统运行正常</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
       {/* 统计卡片 */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         {stats.map((stat, index) => (
           <div
             key={index}
-            className="relative rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-xl border border-cyan-500/30 p-6 overflow-hidden group hover:scale-105 transition-transform duration-300"
+            className={`relative rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-xl border border-cyan-500/30 p-6 overflow-hidden group hover:scale-105 transition-transform duration-300 cursor-pointer ${isEditMode ? 'border-2 border-dashed border-purple-500' : ''}`}
             style={{
               boxShadow: '0 0 40px rgba(6, 182, 212, 0.1)',
             }}
+            onClick={() => {
+              if (!isEditMode) {
+                // 下钻到详情页
+                if (stat.title === '机房总数') router.push('/room/list');
+                else if (stat.title === '设备总数') router.push('/device/list');
+                else if (stat.title === '今日巡检') router.push('/inspection/list');
+                else if (stat.title === '告警数量') router.push('/alarm/current');
+              }
+            }}
           >
+            {/* 编辑模式下的拖拽提示 */}
+            {isEditMode && (
+              <div className="absolute inset-0 bg-purple-500/10 flex items-center justify-center">
+                <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                </svg>
+              </div>
+            )}
             {/* 背景光效 */}
             <div
               className={`absolute inset-0 bg-gradient-to-br ${stat.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
@@ -195,8 +262,17 @@ export default function DashboardPage() {
               {recentInspections.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between p-4 rounded-lg bg-gray-900/50 border border-gray-700/50 hover:border-cyan-500/30 transition-colors"
+                  className={`flex items-center justify-between p-4 rounded-lg bg-gray-900/50 border border-gray-700/50 hover:border-cyan-500/30 transition-colors cursor-pointer ${isEditMode ? 'border-2 border-dashed border-purple-500' : ''}`}
+                  onClick={() => !isEditMode && router.push(`/inspection/detail/${item.id}`)}
                 >
+                  {/* 编辑模式下的拖拽提示 */}
+                  {isEditMode && (
+                    <div className="absolute inset-0 bg-purple-500/10 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                      </svg>
+                    </div>
+                  )}
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500/20 to-blue-600/20 flex items-center justify-center">
                       <svg className="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -255,8 +331,17 @@ export default function DashboardPage() {
               ].map((alert, index) => (
                 <div
                   key={index}
-                  className="p-4 rounded-lg bg-gray-900/50 border border-gray-700/50 hover:border-red-500/30 transition-colors"
+                  className={`p-4 rounded-lg bg-gray-900/50 border border-gray-700/50 hover:border-red-500/30 transition-colors cursor-pointer ${isEditMode ? 'border-2 border-dashed border-purple-500' : ''}`}
+                  onClick={() => !isEditMode && router.push('/alarm/current')}
                 >
+                  {/* 编辑模式下的拖拽提示 */}
+                  {isEditMode && (
+                    <div className="absolute inset-0 bg-purple-500/10 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+                      </svg>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between mb-2">
                     <p className="text-white font-medium">{alert.title}</p>
                     <div
@@ -280,11 +365,19 @@ export default function DashboardPage() {
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 巡检趋势 */}
         <div
-          className="rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-xl border border-cyan-500/30 p-6"
+          className={`rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-xl border border-cyan-500/30 p-6 ${isEditMode ? 'border-2 border-dashed border-purple-500' : ''} cursor-pointer hover:border-cyan-400 transition-colors`}
           style={{
             boxShadow: '0 0 40px rgba(6, 182, 212, 0.1)',
           }}
+          onClick={() => !isEditMode && router.push('/inspection/list')}
         >
+          {isEditMode && (
+            <div className="absolute inset-0 bg-purple-500/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
+            </div>
+          )}
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <div className="w-1 h-6 rounded-full bg-gradient-to-b from-purple-500 to-pink-600"></div>
             巡检趋势分析
@@ -316,11 +409,19 @@ export default function DashboardPage() {
 
         {/* 设备状态分布 */}
         <div
-          className="rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-xl border border-cyan-500/30 p-6"
+          className={`rounded-xl bg-gradient-to-br from-gray-800/80 to-gray-900/80 backdrop-blur-xl border border-cyan-500/30 p-6 ${isEditMode ? 'border-2 border-dashed border-purple-500' : ''} cursor-pointer hover:border-cyan-400 transition-colors`}
           style={{
             boxShadow: '0 0 40px rgba(6, 182, 212, 0.1)',
           }}
+          onClick={() => !isEditMode && router.push('/device/list')}
         >
+          {isEditMode && (
+            <div className="absolute inset-0 bg-purple-500/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
+            </div>
+          )}
           <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
             <div className="w-1 h-6 rounded-full bg-gradient-to-b from-green-500 to-teal-600"></div>
             设备状态分布
@@ -361,6 +462,7 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </MainLayout>
   );
 }
