@@ -50,17 +50,23 @@ export async function POST(request: NextRequest) {
 
     // 生成 token
     const token = generateToken(user.id);
+    const refreshToken = generateToken(user.id);
 
-    // 返回成功响应
+    // 返回成功响应（匹配前端期望的格式）
     const response = {
       success: true,
       message: '登录成功',
-      token,
-      user: {
-        id: user.id,
-        username: user.username,
-        name: user.name,
-        role: user.role,
+      data: {
+        token,
+        refreshToken,
+        user: {
+          id: user.id,
+          username: user.username,
+          name: user.name,
+          role: user.role,
+          email: `${user.username}@example.com`,
+          avatar: null,
+        },
       },
     };
 

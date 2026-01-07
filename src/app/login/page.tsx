@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, FormEvent, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { http } from '@/lib/api';
 
 interface SSOProvider {
@@ -17,10 +17,15 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mounted, setMounted] = useState(false);
-  const [loginType, setLoginType] = useState<'local' | 'sso'>('local');
   const [ssoProviders, setSsoProviders] = useState<SSOProvider[]>([]);
   const [loadingSSO, setLoadingSSO] = useState(false);
+
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const ssoParam = searchParams.get('sso');
+
+  // 根据URL参数判断登录类型
+  const isSSOLogin = ssoParam !== null;
 
   useEffect(() => {
     setMounted(true);
@@ -28,13 +33,15 @@ export default function LoginPage() {
       setCurrentTime(new Date());
     }, 1000);
 
-    // 获取SSO配置
-    fetchSSOProviders();
+    // 如果是SSO登录，获取SSO配置
+    if (isSSOLogin) {
+      fetchSSOProviders();
+    }
 
     return () => {
       clearInterval(timer);
     };
-  }, []);
+  }, [isSSOLogin]);
 
   const fetchSSOProviders = async () => {
     try {
@@ -185,32 +192,6 @@ export default function LoginPage() {
             <p className="text-sm text-gray-400">智能监控 · 实时预警 · 高效运维</p>
           </div>
 
-          {/* 登录方式切换 */}
-          <div className="flex mb-6 bg-gray-900/50 rounded-lg p-1">
-            <button
-              type="button"
-              onClick={() => setLoginType('local')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                loginType === 'local'
-                  ? 'bg-cyan-600 text-white shadow-lg'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              账号密码登录
-            </button>
-            <button
-              type="button"
-              onClick={() => setLoginType('sso')}
-              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                loginType === 'sso'
-                  ? 'bg-cyan-600 text-white shadow-lg'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              单点登录
-            </button>
-          </div>
-
           {/* 错误提示 */}
           {error && (
             <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
@@ -219,7 +200,7 @@ export default function LoginPage() {
           )}
 
           {/* 账密登录表单 */}
-          {loginType === 'local' && (
+          {!isSSOLogin && (
             <form onSubmit={handleLocalLogin} className="space-y-6">
               {/* 用户名输入框 */}
               <div className="space-y-2">
@@ -279,7 +260,7 @@ export default function LoginPage() {
           )}
 
           {/* SSO登录 */}
-          {loginType === 'sso' && (
+          {isSSOLogin && (
             <div className="space-y-4">
               {loadingSSO ? (
                 <div className="text-center text-gray-400 py-8">加载中...</div>

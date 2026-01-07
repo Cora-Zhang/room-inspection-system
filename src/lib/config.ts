@@ -11,6 +11,14 @@ export const getApiUrl = (path: string): string => {
   return `${API_CONFIG.baseURL}${API_CONFIG.apiPrefix}${path}`;
 };
 
+// 获取当前站点的基础URL
+const getOrigin = (): string => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:5000';
+};
+
 // SSO配置
 export const SSO_CONFIG = {
   enabled: process.env.NEXT_PUBLIC_SSO_ENABLED === 'true',
@@ -18,11 +26,11 @@ export const SSO_CONFIG = {
   oauth: {
     clientId: process.env.NEXT_PUBLIC_OAUTH_CLIENT_ID || '',
     authorizationUrl: process.env.NEXT_PUBLIC_OAUTH_AUTHORIZATION_URL || '',
-    callbackUrl: `${window.location.origin}/auth/callback`,
+    callbackUrl: () => `${getOrigin()}/auth/callback`,
   },
   saml: {
     entryPoint: process.env.NEXT_PUBLIC_SAML_ENTRY_POINT || '',
-    callbackUrl: `${window.location.origin}/auth/callback/saml`,
+    callbackUrl: () => `${getOrigin()}/auth/callback/saml`,
   },
 };
 
