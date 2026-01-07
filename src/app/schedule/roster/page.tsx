@@ -6,32 +6,29 @@ import MainLayout from '@/components/Layout/MainLayout';
 interface Schedule {
   id: string;
   date: string;
-  shift: 'morning' | 'afternoon' | 'night';
+  shift: 'day' | 'night';
   staffId: string;
   staffName: string;
   status: 'scheduled' | 'completed' | 'missed';
 }
 
 const shifts = [
-  { key: 'morning', label: '早班', time: '08:00-16:00', color: 'from-cyan-500 to-blue-600' },
-  { key: 'afternoon', label: '中班', time: '16:00-00:00', color: 'from-purple-500 to-pink-600' },
-  { key: 'night', label: '晚班', time: '00:00-08:00', color: 'from-indigo-500 to-violet-600' },
+  { key: 'day', label: '白班', time: '08:00-17:00', color: 'from-cyan-500 to-blue-600' },
+  { key: 'night', label: '夜班', time: '18:00-07:00', color: 'from-purple-500 to-pink-600' },
 ];
 
 export default function RosterPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [schedules, setSchedules] = useState<Schedule[]>([
-    { id: '1', date: '2025-01-07', shift: 'morning', staffId: 'STF-001', staffName: '张三', status: 'completed' },
-    { id: '2', date: '2025-01-07', shift: 'afternoon', staffId: 'STF-002', staffName: '李四', status: 'scheduled' },
-    { id: '3', date: '2025-01-07', shift: 'night', staffId: 'STF-003', staffName: '王五', status: 'scheduled' },
-    { id: '4', date: '2025-01-08', shift: 'morning', staffId: 'STF-004', staffName: '赵六', status: 'scheduled' },
-    { id: '5', date: '2025-01-08', shift: 'afternoon', staffId: 'STF-005', staffName: '孙七', status: 'scheduled' },
-    { id: '6', date: '2025-01-08', shift: 'night', staffId: 'STF-001', staffName: '张三', status: 'scheduled' },
+    { id: '1', date: '2025-01-07', shift: 'day', staffId: 'STF-001', staffName: '张三', status: 'completed' },
+    { id: '2', date: '2025-01-07', shift: 'night', staffId: 'STF-002', staffName: '李四', status: 'scheduled' },
+    { id: '3', date: '2025-01-08', shift: 'day', staffId: 'STF-003', staffName: '王五', status: 'scheduled' },
+    { id: '4', date: '2025-01-08', shift: 'night', staffId: 'STF-001', staffName: '张三', status: 'scheduled' },
   ]);
 
   const [showModal, setShowModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
-  const [selectedShift, setSelectedShift] = useState<keyof typeof shifts>('morning');
+  const [selectedShift, setSelectedShift] = useState<keyof typeof shifts>('day');
   const [formData, setFormData] = useState({
     staffId: '',
     staffName: '',
@@ -239,7 +236,10 @@ export default function RosterPage() {
           <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-2">
             值班排班表
           </h1>
-          <p className="text-gray-400">管理每日值班安排，支持早中晚三班轮换</p>
+          <p className="text-gray-400">
+            管理每日值班安排，实行7×24小时值班制度，白班08:00-17:00，夜班18:00-次日07:00。
+            夜班值班人员在22:00后可睡觉休息，次日早上离开。
+          </p>
         </div>
 
         {/* 统计卡片 */}

@@ -6,7 +6,7 @@ import MainLayout from '@/components/Layout/MainLayout';
 interface Handover {
   id: string;
   date: string;
-  shift: 'morning' | 'afternoon' | 'night';
+  shift: 'day' | 'night';
   outgoingStaff: string;
   incomingStaff: string;
   outgoingTime: string;
@@ -18,9 +18,8 @@ interface Handover {
 }
 
 const shifts = [
-  { key: 'morning', label: '早班', time: '08:00-16:00' },
-  { key: 'afternoon', label: '中班', time: '16:00-00:00' },
-  { key: 'night', label: '晚班', time: '00:00-08:00' },
+  { key: 'day', label: '白班', time: '08:00-17:00' },
+  { key: 'night', label: '夜班', time: '18:00-07:00' },
 ];
 
 export default function HandoverPage() {
@@ -28,11 +27,11 @@ export default function HandoverPage() {
     {
       id: 'HND-001',
       date: '2025-01-07',
-      shift: 'morning',
+      shift: 'day',
       outgoingStaff: '张三',
       incomingStaff: '李四',
-      outgoingTime: '16:00',
-      incomingTime: '16:05',
+      outgoingTime: '17:00',
+      incomingTime: '17:05',
       tasks: ['完成机房A-101巡检', '完成机房A-102巡检', '更新告警记录'],
       issues: ['机房B-203温度偏高，已通知', '服务器DEV-005需要维护'],
       equipmentStatus: '设备运行正常，无异常',
@@ -42,14 +41,14 @@ export default function HandoverPage() {
       id: 'HND-002',
       date: '2025-01-06',
       shift: 'night',
-      outgoingStaff: '赵六',
+      outgoingStaff: '李四',
       incomingStaff: '张三',
-      outgoingTime: '08:00',
-      incomingTime: '08:02',
+      outgoingTime: '07:00',
+      incomingTime: '07:02',
       tasks: ['完成夜间巡检', '监控告警', '处理紧急事件2起'],
       issues: [],
       equipmentStatus: '夜间运行稳定',
-      notes: '交接顺利',
+      notes: '夜班值班人员22:00后已休息',
     },
   ]);
 
@@ -62,7 +61,7 @@ export default function HandoverPage() {
   const [selectedHandover, setSelectedHandover] = useState<Handover | null>(null);
   const [formData, setFormData] = useState({
     date: '',
-    shift: 'morning' as 'morning' | 'afternoon' | 'night',
+    shift: 'day' as 'day' | 'night',
     outgoingStaff: '',
     incomingStaff: '',
     outgoingTime: '',
@@ -90,7 +89,7 @@ export default function HandoverPage() {
     setEditingHandover(null);
     setFormData({
       date: new Date().toISOString().split('T')[0],
-      shift: 'morning',
+      shift: 'day',
       outgoingStaff: '',
       incomingStaff: '',
       outgoingTime: '',
@@ -197,10 +196,8 @@ export default function HandoverPage() {
 
   const getShiftClass = (shift: string) => {
     switch (shift) {
-      case 'morning':
+      case 'day':
         return 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30';
-      case 'afternoon':
-        return 'bg-purple-500/20 text-purple-400 border border-purple-500/30';
       case 'night':
         return 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30';
       default:
@@ -283,9 +280,8 @@ export default function HandoverPage() {
               className="px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
             >
               <option value="all">全部班次</option>
-              <option value="morning">早班</option>
-              <option value="afternoon">中班</option>
-              <option value="night">晚班</option>
+              <option value="day">白班</option>
+              <option value="night">夜班</option>
             </select>
             <input
               type="date"
@@ -453,9 +449,8 @@ export default function HandoverPage() {
                     onChange={(e) => setFormData({ ...formData, shift: e.target.value as any })}
                     className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
                   >
-                    <option value="morning">早班</option>
-                    <option value="afternoon">中班</option>
-                    <option value="night">晚班</option>
+                    <option value="day">白班</option>
+                    <option value="night">夜班</option>
                   </select>
                 </div>
               </div>

@@ -10,16 +10,16 @@ interface Inspection {
   inspectorId: string;
   time: string;
   status: 'completed' | 'processing' | 'pending';
-  shift?: 'morning' | 'afternoon' | 'night';
+  shift?: 'day' | 'night';
 }
 
 export default function InspectionListPage() {
   const [inspections, setInspections] = useState<Inspection[]>([
-    { id: 'INS-2025001', room: '机房A-101', inspector: '张三', inspectorId: 'STF-001', time: '2025-01-07 14:30', status: 'completed', shift: 'morning' },
-    { id: 'INS-2025002', room: '机房A-102', inspector: '李四', inspectorId: 'STF-002', time: '2025-01-07 13:15', status: 'completed', shift: 'morning' },
-    { id: 'INS-2025003', room: '机房B-203', inspector: '王五', inspectorId: 'STF-003', time: '2025-01-07 11:00', status: 'completed', shift: 'morning' },
-    { id: 'INS-2025004', room: '机房C-305', inspector: '赵六', inspectorId: 'STF-004', time: '2025-01-07 10:30', status: 'processing', shift: 'afternoon' },
-    { id: 'INS-2025005', room: '机房A-103', inspector: '孙七', inspectorId: 'STF-005', time: '2025-01-07 09:45', status: 'pending', shift: 'afternoon' },
+    { id: 'INS-2025001', room: '机房A-101', inspector: '张三', inspectorId: 'STF-001', time: '2025-01-07 14:30', status: 'completed', shift: 'day' },
+    { id: 'INS-2025002', room: '机房A-102', inspector: '李四', inspectorId: 'STF-002', time: '2025-01-07 13:15', status: 'completed', shift: 'day' },
+    { id: 'INS-2025003', room: '机房B-203', inspector: '王五', inspectorId: 'STF-003', time: '2025-01-07 11:00', status: 'completed', shift: 'day' },
+    { id: 'INS-2025004', room: '机房C-305', inspector: '张三', inspectorId: 'STF-001', time: '2025-01-07 19:30', status: 'processing', shift: 'night' },
+    { id: 'INS-2025005', room: '机房A-103', inspector: '李四', inspectorId: 'STF-002', time: '2025-01-07 09:45', status: 'pending', shift: 'day' },
   ]);
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,7 +34,7 @@ export default function InspectionListPage() {
     inspector: '',
     inspectorId: '',
     status: 'pending' as 'completed' | 'processing' | 'pending',
-    shift: 'morning' as 'morning' | 'afternoon' | 'night',
+    shift: 'day' as 'day' | 'night',
   });
 
   const filteredInspections = inspections.filter((item) => {
@@ -261,11 +261,10 @@ export default function InspectionListPage() {
                   <td className="px-6 py-4 text-sm text-white">{item.room}</td>
                   <td className="px-6 py-4">
                     <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                      item.shift === 'morning' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' :
-                      item.shift === 'afternoon' ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30' :
+                      item.shift === 'day' ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' :
                       'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                     }`}>
-                      {item.shift === 'morning' ? '早班' : item.shift === 'afternoon' ? '中班' : '晚班'}
+                      {item.shift === 'day' ? '白班' : '夜班'}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-white">{item.inspector}</td>
@@ -344,9 +343,8 @@ export default function InspectionListPage() {
                   onChange={(e) => setFormData({ ...formData, shift: e.target.value as any })}
                   className="w-full px-4 py-2 bg-gray-900/50 border border-gray-700 rounded-lg focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500 text-white"
                 >
-                  <option value="morning">早班</option>
-                  <option value="afternoon">中班</option>
-                  <option value="night">晚班</option>
+                  <option value="day">白班</option>
+                  <option value="night">夜班</option>
                 </select>
               </div>
               <div>
