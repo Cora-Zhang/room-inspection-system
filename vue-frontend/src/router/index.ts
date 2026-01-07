@@ -58,7 +58,27 @@ const routes: RouteRecordRaw[] = [
           title: '巡检管理',
           icon: 'DocumentChecked',
           requiresAuth: true
-        }
+        },
+        children: [
+          {
+            path: 'room-inspection',
+            name: 'RoomInspection',
+            component: () => import('@/views/inspection/index.vue'),
+            meta: {
+              title: '机房巡检',
+              requiresAuth: true
+            }
+          },
+          {
+            path: 'device-inspection',
+            name: 'DeviceInspection',
+            component: () => import('@/views/DeviceInspection.vue'),
+            meta: {
+              title: '网络设备巡检',
+              requiresAuth: true
+            }
+          }
+        ]
       },
       {
         path: 'schedule',
