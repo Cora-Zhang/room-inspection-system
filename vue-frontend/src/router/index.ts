@@ -81,7 +81,7 @@ const routes: RouteRecordRaw[] = [
           {
             path: 'roster',
             name: 'ScheduleRoster',
-            component: () => import('@/views/schedule/roster.vue'),
+            component: () => import('@/views/ShiftSchedule.vue'),
             meta: {
               title: '值班排班表',
               requiresAuth: true
@@ -93,6 +93,15 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/schedule/handover.vue'),
             meta: {
               title: '值班交接',
+              requiresAuth: true
+            }
+          },
+          {
+            path: 'door-access',
+            name: 'DoorAccess',
+            component: () => import('@/views/DoorAccess.vue'),
+            meta: {
+              title: '门禁权限',
               requiresAuth: true
             }
           }

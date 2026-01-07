@@ -1,9 +1,8 @@
 package com.roominspection.backend.entity;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -41,7 +40,17 @@ public class ShiftSchedule {
     private String staffName;
 
     /**
-     * 排班状态：SCHEDULED-已排班，COMPLETED-已完成，MISSED-缺勤
+     * 责任机房ID
+     */
+    private Long roomId;
+
+    /**
+     * 责任机房名称
+     */
+    private String roomName;
+
+    /**
+     * 排班状态：SCHEDULED-已排班，IN_PROGRESS-值班中，COMPLETED-已完成，MISSED-缺勤
      */
     private String status;
 
@@ -56,6 +65,31 @@ public class ShiftSchedule {
     private LocalDateTime actualEndTime;
 
     /**
+     * 数据来源（1-手动创建 2-Excel导入 3-钉钉同步）
+     */
+    private Integer dataSource;
+
+    /**
+     * 导入批次号（用于Excel导入）
+     */
+    private String importBatch;
+
+    /**
+     * 钉钉同步状态（0-未同步 1-已同步 2-同步失败）
+     */
+    private Integer syncDingtalkStatus;
+
+    /**
+     * 钉钉任务ID
+     */
+    private String dingtalkTaskId;
+
+    /**
+     * 周期性排班类型（null-非周期性 1-每周轮换 2-每月轮换 3-季度轮换）
+     */
+    private Integer scheduleType;
+
+    /**
      * 备注
      */
     private String remark;
@@ -63,10 +97,30 @@ public class ShiftSchedule {
     /**
      * 创建时间
      */
-    private LocalDateTime createdAt;
+    @TableField(fill = FieldFill.INSERT)
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
-    private LocalDateTime updatedAt;
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private LocalDateTime updateTime;
+
+    /**
+     * 创建人
+     */
+    @TableField(fill = FieldFill.INSERT)
+    private String createBy;
+
+    /**
+     * 更新人
+     */
+    @TableField(fill = FieldFill.INSERT_UPDATE)
+    private String updateBy;
+
+    /**
+     * 逻辑删除标志
+     */
+    @TableLogic
+    private Integer deleted;
 }
