@@ -58,11 +58,12 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// 打印配置信息（仅开发环境）
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
-  console.log('API Client Configuration:');
-  console.log('Base URL:', getApiUrl(''));
-  console.log('Environment:', process.env.NODE_ENV);
+// 打印配置信息（仅客户端）
+if (typeof window !== 'undefined') {
+  console.log('[API] Client Configuration:');
+  console.log('[API] Base URL:', getApiUrl(''));
+  console.log('[API] Full Login URL:', getApiUrl('/login'));
+  console.log('[API] Environment:', process.env.NODE_ENV);
 }
 
 // 请求拦截器

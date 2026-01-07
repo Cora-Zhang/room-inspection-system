@@ -25,8 +25,12 @@ function generateToken(userId: number): string {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Login API] Request received');
+
     const body = await request.json();
     const { username, password } = body;
+
+    console.log('[Login API] Login attempt:', username);
 
     // 参数验证
     if (!username || !password) {
@@ -70,9 +74,10 @@ export async function POST(request: NextRequest) {
       },
     };
 
+    console.log('[Login API] Login successful:', username);
     return NextResponse.json(response);
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('[Login API] Error:', error);
     return NextResponse.json(
       { error: '服务器内部错误' },
       { status: 500 }

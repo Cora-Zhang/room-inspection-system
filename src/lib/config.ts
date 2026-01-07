@@ -1,14 +1,16 @@
 // API配置
 export const API_CONFIG = {
-  // 开发环境使用本地后端
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000',
+  // Next.js API routes 使用相对路径
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '',
   apiPrefix: '/api',
   timeout: 30000,
 };
 
 // 获取完整的API URL
 export const getApiUrl = (path: string): string => {
-  return `${API_CONFIG.baseURL}${API_CONFIG.apiPrefix}${path}`;
+  // 如果 baseURL 不为空，使用绝对路径；否则使用相对路径
+  const base = API_CONFIG.baseURL;
+  return base ? `${base}${API_CONFIG.apiPrefix}${path}` : `${API_CONFIG.apiPrefix}${path}`;
 };
 
 // 获取当前站点的基础URL
