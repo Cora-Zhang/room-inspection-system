@@ -1,0 +1,299 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户模型
+model User {
+  id                String   @id @default(uuid())
+  username          String   @unique
+  email             String?  @unique
+  password          String?  // SSO登录时可为空
+  realName          String
+  avatar            String?
+  phone             String?
+  departmentId      String?
+  position          String?
+  employeeId        String?  @unique // 员工工号
+  status            UserStatus @default(ACTIVE)
+  source            UserSource @default(LOCAL) // 用户来源
+  externalId        String?  // 外部系统ID (LDAP/HR系统ID)
+  lastLoginAt       DateTime?
+  lastLoginIp       String?
+  failedLoginCount  Int      @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // 关系
+  department        Department? @relation(fields: [departmentId], references: [id])
+  roles             UserRole[]
+
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  LOCKED
+  DELETED
+}
+
+enum UserSource {
+  LOCAL      // 本地创建
+  LDAP       // LDAP/AD同步
+  SSO        // SSO登录自动创建
+  HR_SYSTEM  // HR系统同步
+  IMPORT     // 手动导入
+}
+
+// 部门/组织模型
+model Department {
+  id          String    @id @default(uuid())
+  code        String    @unique // 部门编码
+  name        String
+  parentId    String?
+  level       Int       @default(0)
+  path        String    // 层级路径，如: /1/2/3
+  sort        Int       @default(0)
+  description String?
+  status      OrgStatus @default(ACTIVE)
+  externalId  String?   // 外部系统ID
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // 关系
+  parent      Department? @relation("DepartmentHierarchy", fields: [parentId], references: [id])
+  children    Department[] @relation("DepartmentHierarchy")
+  users       User[]
+  roles       Role[]
+
+  @@map("departments")
+}
+
+enum OrgStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// 角色模型
+model Role {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  departmentId String? // 部门角色（可选）
+  isSystem    Boolean  @default(false) // 系统内置角色
+  status      RoleStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关系
+  department  Department? @relation(fields: [departmentId], references: [id])
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+enum RoleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// 用户-角色关联表
+model UserRole {
+  id        String   @id @default(uuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  // 关系
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+// 权限模型
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  type        PermissionType
+  resource    String   // 资源: user, role, device, etc.
+  action      String   // 操作: create, read, update, delete
+  description String?
+  status      PermissionStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关系
+  roles       RolePermission[]
+
+  @@map("permissions")
+}
+
+enum PermissionType {
+  MENU       // 菜单权限
+  BUTTON     // 按钮权限
+  API        // API权限
+  DATA       // 数据权限
+}
+
+enum PermissionStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// 角色-权限关联表
+model RolePermission {
+  id           String   @id @default(uuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  // 关系
+  role         Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// 数据字典
+model Dictionary {
+  id          String             @id @default(uuid())
+  code        String             @unique
+  name        String
+  description String?
+  category    String
+  status      DictStatus         @default(ACTIVE)
+  sort        Int                @default(0)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  // 关系
+  items       DictionaryItem[]
+
+  @@map("dictionaries")
+}
+
+enum DictStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// 字典项
+model DictionaryItem {
+  id            String   @id @default(uuid())
+  dictionaryId  String
+  code          String
+  label         String
+  value         String
+  icon          String?
+  color         String?
+  sort          Int      @default(0)
+  status        DictStatus @default(ACTIVE)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // 关系
+  dictionary    Dictionary @relation(fields: [dictionaryId], references: [id], onDelete: Cascade)
+
+  @@unique([dictionaryId, code])
+  @@map("dictionary_items")
+}
+
+// UI配置
+model UIConfig {
+  id          String   @id @default(uuid())
+  type        ConfigType
+  key         String   @unique
+  value       String   // JSON字符串
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("ui_configs")
+}
+
+enum ConfigType {
+  THEME
+  LOGO
+  BACKGROUND
+  LAYOUT
+  CUSTOM
+}
+
+// 操作日志
+model AuditLog {
+  id          String   @id @default(uuid())
+  userId      String?
+  username    String?
+  action      String
+  resource    String
+  resourceId  String?
+  method      String
+  path        String
+  ip          String?
+  userAgent   String?
+  statusCode  Int
+  requestTime Int      // 请求耗时(ms)
+  createdAt   DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+// 数据同步日志
+model SyncLog {
+  id          String       @id @default(uuid())
+  type        SyncType
+  adapter     String       // 适配器类型
+  status      SyncStatus
+  startTime   DateTime
+  endTime     DateTime?
+  totalUsers  Int          @default(0)
+  successUsers Int         @default(0)
+  failedUsers  Int         @default(0)
+  totalOrgs   Int          @default(0)
+  successOrgs Int          @default(0)
+  failedOrgs  Int          @default(0)
+  errorMessage String?
+  metadata    String?      // JSON字符串
+  createdAt   DateTime     @default(now())
+
+  @@map("sync_logs")
+}
+
+enum SyncType {
+  USER        // 用户同步
+  ORGANIZATION // 组织同步
+  FULL        // 全量同步
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+  PARTIAL     // 部分成功
+}
+
+// 系统配置
+model SystemConfig {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  value       String
+  category    String
+  description String?
+  isPublic    Boolean  @default(false) // 是否对前端公开
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("system_configs")
+}

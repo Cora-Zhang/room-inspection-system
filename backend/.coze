@@ -1,0 +1,11 @@
+[project]
+entrypoint = "dist/app.js"
+requires = ["nodejs-24"]
+
+[dev]
+build = ["bash", "-c", "pnpm install && npx prisma generate"]
+run = ["pnpm", "dev"]
+
+[deploy]
+build = ["bash", "-c", "pnpm install && npx prisma generate && pnpm run build"]
+run = ["pnpm", "start"]
