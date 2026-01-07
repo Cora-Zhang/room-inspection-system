@@ -77,6 +77,15 @@ const routes: RouteRecordRaw[] = [
               title: '网络设备巡检',
               requiresAuth: true
             }
+          },
+          {
+            path: 'verification',
+            name: 'InspectionVerification',
+            component: () => import('@/views/InspectionVerification.vue'),
+            meta: {
+              title: '巡检核验',
+              requiresAuth: true
+            }
           }
         ]
       },
@@ -126,6 +135,16 @@ const routes: RouteRecordRaw[] = [
             }
           }
         ]
+      },
+      {
+        path: 'power-monitoring',
+        name: 'PowerMonitoring',
+        component: () => import('@/views/PowerMonitoring.vue'),
+        meta: {
+          title: '电力监控',
+          icon: 'Lightning',
+          requiresAuth: true
+        }
       },
       {
         path: 'system',
