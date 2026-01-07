@@ -483,3 +483,74 @@ INSERT INTO `staffs` (`id`, `employee_id`, `name`, `department`, `position`, `ph
 INSERT INTO `shift_schedules` (`id`, `schedule_date`, `shift`, `staff_id`, `staff_name`, `status`) VALUES
 ('schedule-001', CURDATE(), 'DAY', 'staff-001', '张三', 'SCHEDULED'),
 ('schedule-002', CURDATE(), 'NIGHT', 'staff-002', '李四', 'SCHEDULED');
+
+-- ============================================
+-- 接口配置模块
+-- ============================================
+
+-- 接口配置表
+CREATE TABLE IF NOT EXISTS `api_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `config_type` varchar(50) NOT NULL COMMENT '配置类型：DINGTALK-钉钉, SMS-短信, EMAIL-邮件, HIKVISION-海康门禁, DAHUA-大华门禁, SNMP-SNMP监控, MODBUS-Modbus监控, BMS-BMS接口, SENSOR-传感器网络, FIRE-消防主机, OTHER-其他',
+  `config_name` varchar(100) NOT NULL COMMENT '配置名称',
+  `config_key` varchar(100) NOT NULL COMMENT '配置键',
+  `config_value` text DEFAULT NULL COMMENT '配置值（敏感信息需加密存储）',
+  `description` varchar(500) DEFAULT NULL COMMENT '配置描述',
+  `is_sensitive` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否敏感配置（0-否 1-是）',
+  `config_group` varchar(50) DEFAULT NULL COMMENT '配置分组',
+  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用（0-禁用 1-启用）',
+  `sort_order` int NOT NULL DEFAULT '0' COMMENT '排序序号',
+  `created_by` bigint DEFAULT NULL COMMENT '创建人ID',
+  `created_by_name` varchar(50) DEFAULT NULL COMMENT '创建人姓名',
+  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_by` bigint DEFAULT NULL COMMENT '更新人ID',
+  `updated_by_name` varchar(50) DEFAULT NULL COMMENT '更新人姓名',
+  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `remark` text DEFAULT NULL COMMENT '备注',
+  `extra_config` json DEFAULT NULL COMMENT '扩展JSON字段（存储额外的配置信息）',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_config_type_key` (`config_type`,`config_key`),
+  KEY `idx_config_type` (`config_type`),
+  KEY `idx_config_group` (`config_group`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='接口配置表';
+
+-- 插入示例接口配置
+-- 钉钉API配置
+INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
+('DINGTALK', '钉钉AppKey', 'dingtalk.app.key', '', '钉钉开放平台AppKey', 1, '钉钉配置', 1, 1),
+('DINGTALK', '钉钉AppSecret', 'dingtalk.app.secret', '', '钉钉开放平台AppSecret', 1, '钉钉配置', 1, 2),
+('DINGTALK', '钉钉AgentId', 'dingtalk.agent.id', '', '钉钉微应用AgentId', 0, '钉钉配置', 1, 3),
+('DINGTALK', '钉钉API地址', 'dingtalk.api.url', 'https://oapi.dingtalk.com', '钉钉API服务地址', 0, '钉钉配置', 1, 4);
+
+-- 短信API配置
+INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
+('SMS', '阿里云AccessKeyId', 'sms.access.key.id', '', '阿里云短信服务AccessKeyId', 1, '短信配置', 1, 1),
+('SMS', '阿里云AccessKeySecret', 'sms.access.key.secret', '', '阿里云短信服务AccessKeySecret', 1, '短信配置', 1, 2),
+('SMS', '短信签名', 'sms.sign.name', '', '短信签名名称', 0, '短信配置', 1, 3),
+('SMS', '值班提醒模板ID', 'sms.template.shift.remind', '', '值班提醒短信模板ID', 0, '短信配置', 1, 4),
+('SMS', '交接提醒模板ID', 'sms.template.handover.remind', '', '交接提醒短信模板ID', 0, '短信配置', 1, 5);
+
+-- 门禁API配置（海康）
+INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
+('HIKVISION', '海康API地址', 'hikvision.api.url', 'http://localhost:8080/artemis', '海康门禁API地址', 0, '海康门禁', 1, 1),
+('HIKVISION', '海康AppKey', 'hikvision.app.key', '', '海康开放平台AppKey', 1, '海康门禁', 1, 2),
+('HIKVISION', '海康AppSecret', 'hikvision.app.secret', '', '海康开放平台AppSecret', 1, '海康门禁', 1, 3);
+
+-- 门禁API配置（大华）
+INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
+('DAHUA', '大华API地址', 'dahua.api.url', 'http://localhost:8080', '大华门禁API地址', 0, '大华门禁', 1, 1),
+('DAHUA', '大华用户名', 'dahua.username', 'admin', '大华门禁系统用户名', 1, '大华门禁', 1, 2),
+('DAHUA', '大华密码', 'dahua.password', '', '大华门禁系统密码', 1, '大华门禁', 1, 3);
+
+-- 监控协议配置（SNMP）
+INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
+('SNMP', 'SNMP版本', 'snmp.version', 'v2c', 'SNMP协议版本', 0, 'SNMP配置', 1, 1),
+('SNMP', 'SNMP Community', 'snmp.community', 'public', 'SNMP Community字符串', 1, 'SNMP配置', 1, 2),
+('SNMP', 'SNMP超时时间', 'snmp.timeout', '5000', 'SNMP超时时间（毫秒）', 0, 'SNMP配置', 1, 3),
+('SNMP', 'SNMP重试次数', 'snmp.retry', '3', 'SNMP重试次数', 0, 'SNMP配置', 1, 4);
+
+-- 监控协议配置（Modbus）
+INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
+('MODBUS', 'Modbus超时时间', 'modbus.timeout', '3000', 'Modbus超时时间（毫秒）', 0, 'Modbus配置', 1, 1),
+('MODBUS', 'Modbus重试次数', 'modbus.retry', '2', 'Modbus重试次数', 0, 'Modbus配置', 1, 2);

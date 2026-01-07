@@ -111,7 +111,7 @@ const routes: RouteRecordRaw[] = [
         path: 'system',
         name: 'System',
         meta: {
-          title: '系统管理',
+          title: '基础配置',
           icon: 'Setting',
           requiresAuth: true
         },
@@ -158,6 +158,16 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/system/sso.vue'),
             meta: {
               title: 'SSO配置',
+              requiresAuth: true
+            }
+          },
+          {
+            path: 'api-config',
+            name: 'SystemApiConfig',
+            component: () => import('@/views/ApiConfig.vue'),
+            meta: {
+              title: '接口管理',
+              icon: 'Connection',
               requiresAuth: true
             }
           }
