@@ -52,6 +52,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error('Failed to fetch SSO providers:', error);
+      // 不显示错误，静默处理
     } finally {
       setLoadingSSO(false);
     }
@@ -71,20 +72,39 @@ export default function LoginPage() {
     setIsLoading(true);
     setError('');
 
+    console.log('开始登录流程');
+    console.log('用户名:', username);
+    console.log('密码:', password ? '***' : '空');
+
     try {
-      const result = await http.post<any>('/auth/login', {
+      console.log('发送登录请求到: /api/login');
+      const result = await http.post<any>('/login', {
         username,
         password,
       });
+
+      console.log('登录响应:', result);
 
       if (result.success && result.data) {
         localStorage.setItem('token', result.data.token);
         localStorage.setItem('refreshToken', result.data.refreshToken);
         localStorage.setItem('user', JSON.stringify(result.data.user));
+        console.log('登录成功，跳转到 dashboard');
         router.push('/dashboard');
+      } else {
+        console.error('登录响应格式异常:', result);
+        setError('登录失败：服务器返回数据格式异常');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error?.message || '登录失败，请重试');
+      console.error('登录错误:', err);
+      console.error('错误详情:', {
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status,
+        config: err.config,
+      });
+      const errorMessage = err.response?.data?.error || err.response?.data?.message || err.message || '登录失败，请重试';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

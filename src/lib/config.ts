@@ -1,8 +1,8 @@
 // API配置
 export const API_CONFIG = {
   // 开发环境使用本地后端
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000',
-  apiPrefix: '/api/v1',
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000',
+  apiPrefix: '/api',
   timeout: 30000,
 };
 

@@ -58,6 +58,13 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
+// 打印配置信息（仅开发环境）
+if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+  console.log('API Client Configuration:');
+  console.log('Base URL:', getApiUrl(''));
+  console.log('Environment:', process.env.NODE_ENV);
+}
+
 // 请求拦截器
 apiClient.interceptors.request.use(
   (config) => {
@@ -82,6 +89,11 @@ apiClient.interceptors.response.use(
 
     // Token过期，尝试刷新
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // 检查是否是登录请求，如果是则不刷新token
+      if (originalRequest.url?.includes('/login')) {
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       try {
