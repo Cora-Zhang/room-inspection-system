@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body, validationResult, query } from 'express-validator';
 import { authenticate } from '../middlewares/auth.middleware';
 import {
   localLogin,
@@ -9,6 +9,7 @@ import {
 } from '../services/auth.service';
 import { requireAdmin } from '../middlewares/rbac.middleware';
 import prisma from '../utils/prisma';
+import { createOAuth2Strategy, getEnabledSSOProviders } from '../strategies/oauth.strategy';
 
 const router = Router();
 
@@ -219,5 +220,85 @@ router.post('/logout', authenticate, (req, res) => {
     message: '登出成功',
   });
 });
+
+// ========== SSO/OAuth2 相关路由 ==========
+
+// 获取启用的SSO提供商列表
+router.get('/sso/providers', async (req, res, next) => {
+  try {
+    const providers = await getEnabledSSOProviders();
+    res.json({
+      success: true,
+      data: providers,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// 获取OAuth2授权URL
+router.get(
+  '/sso/authorize/:provider',
+  [query('redirect').optional().isString()],
+  async (req, res, next) => {
+    try {
+      const { provider } = req.params;
+      const { redirect } = req.query;
+
+      const strategy = await createOAuth2Strategy(provider);
+      const authUrl = strategy.getAuthorizationUrl();
+
+      res.json({
+        success: true,
+        data: {
+          authUrl,
+          provider,
+        },
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+);
+
+// OAuth2回调处理
+router.post(
+  '/sso/callback/:provider',
+  [
+    body('code').notEmpty().withMessage('授权码不能为空'),
+    body('state').optional().isString(),
+  ],
+  async (req, res, next) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: '参数验证失败',
+            details: errors.array(),
+          },
+        });
+      }
+
+      const { provider } = req.params;
+      const { code } = req.body;
+
+      // 创建OAuth2策略并执行认证
+      const strategy = await createOAuth2Strategy(provider);
+      const loginResult = await strategy.authenticate(code);
+
+      res.json({
+        success: true,
+        data: loginResult,
+        message: '登录成功',
+      });
+    } catch (error: any) {
+      console.error('OAuth2 callback error:', error);
+      next(error);
+    }
+  }
+);
 
 export default router;

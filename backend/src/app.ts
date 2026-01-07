@@ -19,6 +19,7 @@ import departmentRoutes from './routes/department.routes';
 import dictionaryRoutes from './routes/dictionary.routes';
 import syncRoutes from './routes/sync.routes';
 import configRoutes from './routes/config.routes';
+import ssoRoutes from './routes/sso.routes';
 
 // 初始化Express应用
 const app: Application = express();
@@ -80,6 +81,7 @@ app.use(`${apiPrefix}/departments`, departmentRoutes);
 app.use(`${apiPrefix}/dictionaries`, dictionaryRoutes);
 app.use(`${apiPrefix}/sync`, syncRoutes);
 app.use(`${apiPrefix}/config`, configRoutes);
+app.use(`${apiPrefix}/sso`, ssoRoutes);
 
 // 404处理
 app.use(notFoundHandler);

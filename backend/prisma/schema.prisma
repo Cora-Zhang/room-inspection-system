@@ -297,3 +297,19 @@ model SystemConfig {
 
   @@map("system_configs")
 }
+
+// SSO配置
+model SSOConfig {
+  id          String    @id @default(uuid())
+  provider    String    @unique // 提供商: oauth2, saml, cas
+  name        String    // 显示名称，如 "IAM认证"
+  type        String    // 认证类型: oauth2, saml, cas
+  enabled     Boolean   @default(false) // 是否启用
+  config      String    // JSON格式的配置参数
+  description String?
+  sort        Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("sso_configs")
+}
