@@ -1,0 +1,12 @@
+# 主流浏览器兼容性配置
+# 支持最近2个版本的Chrome和Edge
+> 1%
+last 2 versions
+not dead
+not ie 11
+Chrome >= 90
+Edge >= 90
+Safari >= 14
+Firefox >= 88
+iOS >= 14
+Android >= 10
