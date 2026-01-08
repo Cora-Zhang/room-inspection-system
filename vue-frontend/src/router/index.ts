@@ -167,6 +167,26 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'air-conditioner-monitoring',
+        name: 'AirConditionerMonitoring',
+        component: () => import('@/views/AirConditionerMonitoring.vue'),
+        meta: {
+          title: '精密空调监控',
+          icon: 'WindPower',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'fire-protection-monitoring',
+        name: 'FireProtectionMonitoring',
+        component: () => import('@/views/FireProtectionMonitoring.vue'),
+        meta: {
+          title: '消防保障系统',
+          icon: 'Shield',
+          requiresAuth: true
+        }
+      },
+      {
         path: 'system',
         name: 'System',
         meta: {

@@ -1122,3 +1122,299 @@ INSERT INTO `environment_data` (`sensor_id`, `room_id`, `data_type`, `value`, `u
 (3, 1, 'HUMIDITY', 54.0, '%', 0, NULL, NOW()),
 (4, 1, 'WATER', 0.0, '', 0, NULL, NOW()),
 (5, 1, 'SMOKE', 0.0, '', 0, NULL, NOW());
+
+-- ============================================
+-- 精密空调运行监控模块
+-- ============================================
+
+-- 精密空调表
+CREATE TABLE IF NOT EXISTS `air_conditioner` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `ac_code` varchar(50) NOT NULL COMMENT '空调编号',
+  `ac_name` varchar(100) NOT NULL COMMENT '空调名称',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `location` varchar(200) DEFAULT NULL COMMENT '安装位置',
+  `brand` varchar(50) DEFAULT NULL COMMENT '品牌',
+  `model` varchar(100) DEFAULT NULL COMMENT '型号',
+  `cooling_capacity` double DEFAULT NULL COMMENT '制冷量(kW)',
+  `run_mode` int NOT NULL DEFAULT 0 COMMENT '当前运行模式（0-关闭，1-制冷，2-制热，3-除湿，4-通风）',
+  `set_temperature` double DEFAULT NULL COMMENT '设定温度(℃)',
+  `current_return_temp` double DEFAULT NULL COMMENT '当前回风温度(℃)',
+  `current_return_humidity` double DEFAULT NULL COMMENT '当前回风湿度(%)',
+  `compressor_runtime_hours` double NOT NULL DEFAULT 0.0 COMMENT '压缩机累计运行时长(小时)',
+  `last_maintenance_time` datetime DEFAULT NULL COMMENT '上次保养时间',
+  `next_maintenance_time` datetime DEFAULT NULL COMMENT '下次保养时间',
+  `maintenance_threshold` double NOT NULL DEFAULT 1000.0 COMMENT '保养阈值(小时)，达到此阈值自动触发保养工单',
+  `status` int NOT NULL DEFAULT 0 COMMENT '状态（0-正常，1-告警，2-离线）',
+  `last_collect_time` datetime DEFAULT NULL COMMENT '最后采集时间',
+  `remark` text DEFAULT NULL COMMENT '备注',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
+  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_ac_code` (`ac_code`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_run_mode` (`run_mode`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='精密空调表';
+
+-- 空调运行数据表
+CREATE TABLE IF NOT EXISTS `air_conditioner_data` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `ac_id` bigint DEFAULT NULL COMMENT '空调ID',
+  `ac_code` varchar(50) DEFAULT NULL COMMENT '空调编号',
+  `run_mode` int NOT NULL DEFAULT 0 COMMENT '运行模式（0-关闭，1-制冷，2-制热，3-除湿，4-通风）',
+  `set_temperature` double DEFAULT NULL COMMENT '设定温度(℃)',
+  `return_temperature` double DEFAULT NULL COMMENT '回风温度(℃)',
+  `return_humidity` double DEFAULT NULL COMMENT '回风湿度(%)',
+  `supply_temperature` double DEFAULT NULL COMMENT '送风温度(℃)',
+  `compressor1_status` int NOT NULL DEFAULT 0 COMMENT '压缩机1状态（0-停止，1-运行）',
+  `compressor2_status` int NOT NULL DEFAULT 0 COMMENT '压缩机2状态（0-停止，1-运行）',
+  `fan1_status` int NOT NULL DEFAULT 0 COMMENT '风机1状态（0-停止，1-运行）',
+  `fan2_status` int NOT NULL DEFAULT 0 COMMENT '风机2状态（0-停止，1-运行）',
+  `humidifier_status` int NOT NULL DEFAULT 0 COMMENT '加湿器状态（0-停止，1-运行）',
+  `heater_status` int NOT NULL DEFAULT 0 COMMENT '电加热器状态（0-关闭，1-开启）',
+  `current_power` double DEFAULT NULL COMMENT '当前功率(kW)',
+  `temperature_diff` double DEFAULT NULL COMMENT '温差：回风温度 - 设定温度',
+  `is_diff_abnormal` int NOT NULL DEFAULT 0 COMMENT '是否温差异常（0-正常，1-异常）',
+  `collect_time` datetime NOT NULL COMMENT '采集时间',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_ac_id` (`ac_id`),
+  KEY `idx_ac_code` (`ac_code`),
+  KEY `idx_collect_time` (`collect_time`),
+  KEY `idx_is_diff_abnormal` (`is_diff_abnormal`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='空调运行数据表';
+
+-- 效率核查工单表
+CREATE TABLE IF NOT EXISTS `efficiency_check_order` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `order_no` varchar(50) NOT NULL COMMENT '工单编号',
+  `ac_id` bigint DEFAULT NULL COMMENT '空调ID',
+  `ac_code` varchar(50) DEFAULT NULL COMMENT '空调编号',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `order_type` int NOT NULL COMMENT '工单类型（1-制冷效率检查，2-滤网清洁检查，3-预防性保养）',
+  `trigger_reason` varchar(500) DEFAULT NULL COMMENT '触发原因',
+  `abnormal_detail` text DEFAULT NULL COMMENT '异常详情：温差异常描述、压缩机时长等',
+  `priority` int NOT NULL DEFAULT 3 COMMENT '优先级（1-紧急，2-高，3-中，4-低）',
+  `status` int NOT NULL DEFAULT 0 COMMENT '工单状态（0-待指派，1-待处理，2-处理中，3-已完成，4-已取消）',
+  `assignee` varchar(50) DEFAULT NULL COMMENT '指派人',
+  `assign_time` datetime DEFAULT NULL COMMENT '指派时间',
+  `start_time` datetime DEFAULT NULL COMMENT '开始处理时间',
+  `complete_time` datetime DEFAULT NULL COMMENT '完成时间',
+  `handle_result` text DEFAULT NULL COMMENT '处理结果',
+  `handle_description` text DEFAULT NULL COMMENT '处理描述',
+  `photos` text DEFAULT NULL COMMENT '现场照片',
+  `remark` text DEFAULT NULL COMMENT '工单备注',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
+  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_order_no` (`order_no`),
+  KEY `idx_ac_id` (`ac_id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_order_type` (`order_type`),
+  KEY `idx_status` (`status`),
+  KEY `idx_priority` (`priority`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='效率核查工单表';
+
+-- 插入示例精密空调
+INSERT INTO `air_conditioner` (`ac_code`, `ac_name`, `room_id`, `location`, `brand`, `model`, `cooling_capacity`, `run_mode`, `set_temperature`, `current_return_temp`, `current_return_humidity`, `compressor_runtime_hours`, `maintenance_threshold`, `status`) VALUES
+('AC-001', '机房A精密空调1', 1, 'A区西北角', 'Liebert', 'iCOM-CM60', 60.0, 1, 22.0, 23.0, 55.0, 5000.5, 10000.0, 0),
+('AC-002', '机房A精密空调2', 1, 'A区东南角', 'Emerson', 'XD 80', 80.0, 1, 22.0, 22.5, 54.0, 4500.0, 10000.0, 0),
+('AC-003', '机房B精密空调1', 2, '机房中心', 'Liebert', 'iCOM-CM40', 40.0, 1, 22.0, 23.5, 56.0, 3000.0, 10000.0, 0);
+
+-- ============================================
+-- 消防保障系统监控模块
+-- ============================================
+
+-- 灭火器表
+CREATE TABLE IF NOT EXISTS `fire_extinguisher` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `extinguisher_code` varchar(50) NOT NULL COMMENT '灭火器编号',
+  `extinguisher_name` varchar(100) NOT NULL COMMENT '灭火器名称',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `location` varchar(200) DEFAULT NULL COMMENT '安装位置',
+  `extinguisher_type` int NOT NULL DEFAULT 1 COMMENT '灭火器类型（1-干粉，2-二氧化碳，3-七氟丙烷，4-其他）',
+  `specification` varchar(50) DEFAULT NULL COMMENT '规格(如：4kg、50kg)',
+  `manufacturer` varchar(100) DEFAULT NULL COMMENT '生产厂家',
+  `manufacture_date` datetime DEFAULT NULL COMMENT '出厂日期',
+  `last_refill_date` datetime DEFAULT NULL COMMENT '上次充装日期',
+  `next_refill_date` datetime DEFAULT NULL COMMENT '下次充装日期',
+  `rated_pressure` double DEFAULT NULL COMMENT '额定压力(MPa)',
+  `current_pressure` double DEFAULT NULL COMMENT '当前压力(MPa)',
+  `pressure_status` int NOT NULL DEFAULT 0 COMMENT '压力状态（0-正常，1-偏低，2-偏低预警，3-异常）',
+  `weight` double DEFAULT NULL COMMENT '重量(kg)',
+  `current_weight` double DEFAULT NULL COMMENT '当前重量(kg)，来自智能称重传感器',
+  `weight_status` int NOT NULL DEFAULT 0 COMMENT '重量状态（0-正常，1-偏低，2-偏低预警，3-异常）',
+  `pressure_meter_type` int NOT NULL DEFAULT 0 COMMENT '压力表类型（0-模拟表，1-数字压力表）',
+  `support_weighing` int NOT NULL DEFAULT 0 COMMENT '是否支持智能称重（0-不支持，1-支持）',
+  `pressure_sensor_id` varchar(100) DEFAULT NULL COMMENT '数字压力表传感器ID',
+  `weighing_sensor_id` varchar(100) DEFAULT NULL COMMENT '智能称重传感器ID',
+  `pressure_alert_threshold` double NOT NULL DEFAULT 0.8 COMMENT '压力预警阈值(MPa)，低于此值触发预警',
+  `pressure_abnormal_threshold` double NOT NULL DEFAULT 0.6 COMMENT '压力异常阈值(MPa)，低于此值触发异常',
+  `weight_alert_threshold` double DEFAULT NULL COMMENT '重量预警阈值(kg)，低于此值触发预警',
+  `weight_abnormal_threshold` double DEFAULT NULL COMMENT '重量异常阈值(kg)，低于此值触发异常',
+  `status` int NOT NULL DEFAULT 0 COMMENT '状态（0-正常，1-告警，2-离线）',
+  `last_collect_time` datetime DEFAULT NULL COMMENT '最后采集时间',
+  `remark` text DEFAULT NULL COMMENT '备注',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
+  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_extinguisher_code` (`extinguisher_code`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_extinguisher_type` (`extinguisher_type`),
+  KEY `idx_pressure_status` (`pressure_status`),
+  KEY `idx_weight_status` (`weight_status`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='灭火器表';
+
+-- 灭火器检查记录表
+CREATE TABLE IF NOT EXISTS `fire_extinguisher_check` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `check_no` varchar(50) NOT NULL COMMENT '检查记录编号',
+  `extinguisher_id` bigint DEFAULT NULL COMMENT '灭火器ID',
+  `extinguisher_code` varchar(50) DEFAULT NULL COMMENT '灭火器编号',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `check_type` int NOT NULL COMMENT '检查类型（1-月度称重与外观检查，2-紧急确认，3-年度检查）',
+  `checker` varchar(50) DEFAULT NULL COMMENT '检查人',
+  `check_time` datetime DEFAULT NULL COMMENT '检查时间',
+  `pressure_value` double DEFAULT NULL COMMENT '压力值(MPa)',
+  `pressure_status` int NOT NULL DEFAULT 0 COMMENT '压力状态（0-正常，1-偏低，2-异常）',
+  `weight_value` double DEFAULT NULL COMMENT '重量值(kg)',
+  `weight_status` int NOT NULL DEFAULT 0 COMMENT '重量状态（0-正常，1-偏低，2-异常）',
+  `appearance_status` int NOT NULL DEFAULT 0 COMMENT '外观检查结果（0-完好，1-轻微损坏，2-严重损坏）',
+  `appearance_description` varchar(500) DEFAULT NULL COMMENT '外观检查描述',
+  `photos` text DEFAULT NULL COMMENT '检查照片',
+  `need_refill` int NOT NULL DEFAULT 0 COMMENT '是否需要充装（0-否，1-是）',
+  `refill_remark` varchar(500) DEFAULT NULL COMMENT '充装备注',
+  `check_result` int NOT NULL DEFAULT 0 COMMENT '检查结果（0-合格，1-不合格）',
+  `handling_measures` text DEFAULT NULL COMMENT '处理措施',
+  `remark` text DEFAULT NULL COMMENT '备注',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
+  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_check_no` (`check_no`),
+  KEY `idx_extinguisher_id` (`extinguisher_id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_check_type` (`check_type`),
+  KEY `idx_check_time` (`check_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='灭火器检查记录表';
+
+-- 消防主机日志表
+CREATE TABLE IF NOT EXISTS `fire_host_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `host_id` bigint DEFAULT NULL COMMENT '消防主机ID',
+  `host_code` varchar(50) DEFAULT NULL COMMENT '消防主机编号',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `signal_type` int NOT NULL COMMENT '信号类型（1-一般信号，2-火警信号，3-故障信号，4-故障恢复）',
+  `loop_no` varchar(50) DEFAULT NULL COMMENT '回路号',
+  `detector_address` varchar(50) DEFAULT NULL COMMENT '探测器地址',
+  `detector_type` int DEFAULT NULL COMMENT '探测器类型（1-感烟，2-感温，3-感光，4-手动报警按钮，5-输入模块，6-输出模块）',
+  `detector_location` varchar(200) DEFAULT NULL COMMENT '探测器位置',
+  `signal_description` varchar(500) DEFAULT NULL COMMENT '信号描述',
+  `signal_time` datetime NOT NULL COMMENT '信号时间',
+  `confirmed` int NOT NULL DEFAULT 0 COMMENT '是否已确认（0-未确认，1-已确认）',
+  `confirmer` varchar(50) DEFAULT NULL COMMENT '确认人',
+  `confirm_time` datetime DEFAULT NULL COMMENT '确认时间',
+  `confirm_remark` varchar(500) DEFAULT NULL COMMENT '确认备注',
+  `handled` int NOT NULL DEFAULT 0 COMMENT '是否已处理（0-未处理，1-已处理）',
+  `handler` varchar(50) DEFAULT NULL COMMENT '处理人',
+  `handle_time` datetime DEFAULT NULL COMMENT '处理时间',
+  `handle_result` varchar(500) DEFAULT NULL COMMENT '处理结果',
+  `alert_status` int NOT NULL DEFAULT 0 COMMENT '告警状态（0-未发送，1-已发送）',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_host_id` (`host_id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_signal_type` (`signal_type`),
+  KEY `idx_signal_time` (`signal_time`),
+  KEY `idx_confirmed` (`confirmed`),
+  KEY `idx_handled` (`handled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消防主机日志表';
+
+-- 气体压力监控表
+CREATE TABLE IF NOT EXISTS `gas_pressure_monitor` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `system_id` bigint DEFAULT NULL COMMENT '灭火系统ID',
+  `system_code` varchar(50) NOT NULL COMMENT '系统编号',
+  `system_name` varchar(100) NOT NULL COMMENT '系统名称',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `gas_type` int NOT NULL DEFAULT 1 COMMENT '灭火气体类型（1-七氟丙烷，2-IG541，3-二氧化碳）',
+  `bottle_code` varchar(50) NOT NULL COMMENT '钢瓶编号',
+  `bottle_location` varchar(200) DEFAULT NULL COMMENT '钢瓶位置',
+  `rated_pressure` double NOT NULL COMMENT '额定压力(MPa)',
+  `current_pressure` double DEFAULT NULL COMMENT '当前压力(MPa)',
+  `pressure_status` int NOT NULL DEFAULT 0 COMMENT '压力状态（0-正常，1-偏低，2-预警，3-异常）',
+  `alert_threshold` double NOT NULL DEFAULT 1.5 COMMENT '预警阈值(MPa)',
+  `abnormal_threshold` double NOT NULL DEFAULT 1.0 COMMENT '异常阈值(MPa)',
+  `sensor_id` varchar(100) DEFAULT NULL COMMENT '压力传感器ID',
+  `last_collect_time` datetime DEFAULT NULL COMMENT '最后采集时间',
+  `status` int NOT NULL DEFAULT 0 COMMENT '状态（0-正常，1-告警，2-离线）',
+  `remark` text DEFAULT NULL COMMENT '备注',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
+  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_system_code` (`system_code`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_gas_type` (`gas_type`),
+  KEY `idx_pressure_status` (`pressure_status`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='气体压力监控表';
+
+-- 消防设施审验提醒表
+CREATE TABLE IF NOT EXISTS `fire_inspection_reminder` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+  `reminder_no` varchar(50) NOT NULL COMMENT '提醒编号',
+  `facility_id` bigint DEFAULT NULL COMMENT '设施ID',
+  `facility_name` varchar(100) NOT NULL COMMENT '设施名称',
+  `facility_type` int NOT NULL COMMENT '设施类型（1-灭火器，2-气体灭火系统，3-消防主机，4-消防栓，5-喷淋系统，6-应急照明）',
+  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
+  `facility_code` varchar(50) DEFAULT NULL COMMENT '设施编号',
+  `facility_location` varchar(200) DEFAULT NULL COMMENT '设施位置',
+  `inspection_type` int NOT NULL COMMENT '审验类型（1-年度检查，2-充装检查，3-专业检测，4-法定审验）',
+  `last_inspection_date` date DEFAULT NULL COMMENT '上次审验日期',
+  `inspection_period` int NOT NULL COMMENT '法定审验周期(月)',
+  `next_inspection_date` date NOT NULL COMMENT '下次审验日期',
+  `reminder_type` int NOT NULL COMMENT '提醒类型（1-提前30天，2-提前7天，3-提前1天）',
+  `reminder_content` text DEFAULT NULL COMMENT '提醒内容',
+  `reminder_date` date NOT NULL COMMENT '提醒日期',
+  `handled` int NOT NULL DEFAULT 0 COMMENT '是否已处理（0-未处理，1-已处理）',
+  `handler` varchar(50) DEFAULT NULL COMMENT '处理人',
+  `handle_time` datetime DEFAULT NULL COMMENT '处理时间',
+  `handle_result` varchar(500) DEFAULT NULL COMMENT '处理结果',
+  `remark` text DEFAULT NULL COMMENT '备注',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
+  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_reminder_no` (`reminder_no`),
+  KEY `idx_facility_id` (`facility_id`),
+  KEY `idx_room_id` (`room_id`),
+  KEY `idx_facility_type` (`facility_type`),
+  KEY `idx_reminder_date` (`reminder_date`),
+  KEY `idx_handled` (`handled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消防设施审验提醒表';
+
+-- 插入示例灭火器
+INSERT INTO `fire_extinguisher` (`extinguisher_code`, `extinguisher_name`, `room_id`, `location`, `extinguisher_type`, `specification`, `manufacturer`, `manufacture_date`, `rated_pressure`, `current_pressure`, `weight`, `current_weight`, `pressure_meter_type`, `support_weighing`, `pressure_alert_threshold`, `pressure_abnormal_threshold`, `status`) VALUES
+('FE-001', '机房A-01灭火器', 1, '机房A入口左侧', 1, '4kg ABC干粉', '北消', '2023-01-15', 1.2, 1.2, 4.0, 4.0, 1, 1, 0.8, 0.6, 0),
+('FE-002', '机房A-02灭火器', 1, '机房A入口右侧', 1, '4kg ABC干粉', '北消', '2023-01-15', 1.2, 1.18, 4.0, 4.0, 1, 1, 0.8, 0.6, 0),
+('FE-003', '机房B-01灭火器', 2, '机房B入口左侧', 1, '4kg ABC干粉', '北消', '2023-03-20', 1.2, 1.19, 4.0, 4.0, 1, 1, 0.8, 0.6, 0),
+('FE-004', '机房A-01二氧化碳灭火器', 1, '机房A配电室', 2, '7kg', '中消', '2023-02-10', 5.5, 5.5, 7.0, 7.0, 1, 0, 4.5, 3.5, 0);
+
+-- 插入示例气体灭火系统
+INSERT INTO `gas_pressure_monitor` (`system_code`, `system_name`, `room_id`, `gas_type`, `bottle_code`, `bottle_location`, `rated_pressure`, `current_pressure`, `alert_threshold`, `abnormal_threshold`, `status`) VALUES
+('GAS-001', '机房A七氟丙烷灭火系统', 1, 1, 'BOTTLE-001', '机房A气瓶间', 2.5, 2.48, 1.5, 1.0, 0),
+('GAS-002', '机房A七氟丙烷灭火系统', 1, 1, 'BOTTLE-002', '机房A气瓶间', 2.5, 2.49, 1.5, 1.0, 0),
+('GAS-003', '机房B七氟丙烷灭火系统', 2, 1, 'BOTTLE-003', '机房B气瓶间', 2.5, 2.47, 1.5, 1.0, 0);
+
