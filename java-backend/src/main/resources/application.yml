@@ -168,3 +168,54 @@ alert:
     secret-key: ${SMS_SECRET_KEY:your-secret-key}
     sign-name: ${SMS_SIGN_NAME:机房巡检}
     template-code: ${SMS_TEMPLATE_CODE:your-template-code}
+
+# 安全配置
+security:
+  ssl:
+    # 客户端密钥库路径（用于双向SSL认证）
+    key-store: ${SSL_KEY_STORE:/path/to/client.jks}
+    # 客户端密钥库密码
+    key-store-password: ${SSL_KEY_STORE_PASSWORD:changeit}
+    # 信任库路径（用于验证服务端证书）
+    trust-store: ${SSL_TRUST_STORE:/path/to/truststore.jks}
+    # 信任库密码
+    trust-store-password: ${SSL_TRUST_STORE_PASSWORD:changeit}
+
+# 数据加密配置
+encryption:
+  # AES加密密钥（至少256位）
+  secret-key: ${ENCRYPTION_SECRET_KEY:your-256-bit-encryption-key-change-me-in-production}
+  # 是否启用数据加密
+  enabled: true
+
+# 操作日志配置
+audit-log:
+  # 是否启用操作日志
+  enabled: true
+  # 日志保留天数
+  retain-days: 180
+  # 是否异步保存
+  async: true
+  # 是否记录请求参数
+  log-params: true
+  # 是否记录响应结果
+  log-result: false
+
+# 密码策略配置
+password:
+  # 密码最小长度
+  min-length: 8
+  # 是否必须包含数字
+  require-digit: true
+  # 是否必须包含小写字母
+  require-lowercase: true
+  # 是否必须包含大写字母
+  require-uppercase: true
+  # 是否必须包含特殊字符
+  require-special-char: true
+  # 密码有效期（天）
+  expire-days: 90
+  # 最大失败次数
+  max-failed-attempts: 5
+  # 锁定时间（分钟）
+  lock-time: 30
