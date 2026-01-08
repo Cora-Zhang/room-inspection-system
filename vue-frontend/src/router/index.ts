@@ -187,6 +187,26 @@ const routes: RouteRecordRaw[] = [
         }
       },
       {
+        path: 'comprehensive-dashboard',
+        name: 'ComprehensiveDashboard',
+        component: () => import('@/views/ComprehensiveDashboard.vue'),
+        meta: {
+          title: '综合巡检看板',
+          icon: 'Monitor',
+          requiresAuth: true
+        }
+      },
+      {
+        path: 'work-order-management',
+        name: 'WorkOrderManagement',
+        component: () => import('@/views/WorkOrderManagement.vue'),
+        meta: {
+          title: '工单与任务管理',
+          icon: 'Tickets',
+          requiresAuth: true
+        }
+      },
+      {
         path: 'system',
         name: 'System',
         meta: {
