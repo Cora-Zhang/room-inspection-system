@@ -1,0 +1,112 @@
+# 开发环境配置
+spring:
+  application:
+    name: room-inspection
+
+  # 数据源配置
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/room_inspection_dev?useSSL=false&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+    username: root
+    password: dev_password
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # Redis配置
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    password:
+    timeout: 5000
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: -1
+        max-idle: 8
+        min-idle: 0
+
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+# 服务器配置
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  tomcat:
+    max-threads: 50
+    min-spare-threads: 10
+    max-connections: 200
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.roominspection: DEBUG
+    org.springframework.web: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# MyBatis Plus配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: uuid
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 监控配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+
+# 应用配置
+app:
+  # JWT配置
+  jwt:
+    secret: dev-secret-key-change-in-production
+    expiration: 86400000
+
+  # 文件上传配置
+  file:
+    upload-path: /tmp/uploads
+    max-size: 10MB
+
+  # 监控配置
+  monitor:
+    thread-pool:
+      core-size: 10
+      max-size: 20
+      queue-capacity: 100
+
+  # 告警配置
+  alert:
+    enabled: true
+    channels:
+      - email
+      - dingtalk
+
+  # SSO配置（开发环境）
+  sso:
+    enabled: false

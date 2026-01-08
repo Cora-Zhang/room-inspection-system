@@ -1,0 +1,156 @@
+# 后端服务告警规则
+
+groups:
+  - name: backend
+    interval: 30s
+    rules:
+      # ==================== 应用可用性告警 ====================
+      - alert: ApplicationDown
+        expr: up{job="room-inspection-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: ops
+        annotations:
+          summary: "应用实例宕机"
+          description: "实例 {{ $labels.instance }} 宕机超过1分钟"
+
+      # ==================== 性能告警 ====================
+      - alert: HighResponseTime
+        expr: |
+          rate(http_server_requests_seconds_sum{job="room-inspection-backend"}[5m])
+          /
+          rate(http_server_requests_seconds_count{job="room-inspection-backend"}[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "响应时间过长"
+          description: "实例 {{ $labels.instance }} 平均响应时间超过2秒，当前值: {{ $value }}s"
+
+      - alert: HighErrorRate
+        expr: |
+          rate(http_server_requests_seconds_count{job="room-inspection-backend",status=~"5.."}[5m])
+          /
+          rate(http_server_requests_seconds_count{job="room-inspection-backend"}[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "错误率过高"
+          description: "实例 {{ $labels.instance }} 错误率超过1%，当前值: {{ $value | humanizePercentage }}"
+
+      - alert: HighRequestRate
+        expr: rate(http_server_requests_seconds_count{job="room-inspection-backend"}[5m]) > 500
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "请求量过大"
+          description: "实例 {{ $labels.instance }} 请求量超过500请求/秒，当前值: {{ $value }}请求/秒"
+
+      # ==================== JVM告警 ====================
+      - alert: HighHeapMemoryUsage
+        expr: |
+          jvm_memory_used_bytes{job="room-inspection-backend",area="heap"}
+          /
+          jvm_memory_max_bytes{job="room-inspection-backend",area="heap"} > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "堆内存使用率过高"
+          description: "实例 {{ $labels.instance }} 堆内存使用率超过90%，当前值: {{ $value | humanizePercentage }}"
+
+      - alert: HighGCPauseTime
+        expr: rate(jvm_gc_pause_seconds_sum[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "GC暂停时间过长"
+          description: "实例 {{ $labels.instance }} GC暂停时间超过0.1秒，当前值: {{ $value }}s"
+
+      - alert: HighThreadCount
+        expr: jvm_threads_current{job="room-inspection-backend"} > 200
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "线程数过多"
+          description: "实例 {{ $labels.instance }} 线程数超过200，当前值: {{ $value }}"
+
+      # ==================== 数据库告警 ====================
+      - alert: HighDatabaseConnectionUsage
+        expr: hikaricp_connections_active / hikaricp_connections_max > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "数据库连接池使用率过高"
+          description: "实例 {{ $labels.instance }} 数据库连接池使用率超过90%，当前值: {{ $value | humanizePercentage }}"
+
+      - alert: DatabaseConnectionLeak
+        expr: increase(hikaricp_connections_active[5m]) > 10
+        for: 5m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "疑似数据库连接泄漏"
+          description: "实例 {{ $labels.instance }} 数据库连接数持续增长"
+
+      # ==================== Redis告警 ====================
+      - alert: HighRedisConnectionUsage
+        expr: redis_connected_clients / redis_config_maxclients > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Redis连接数过多"
+          description: "Redis连接数使用率超过90%，当前值: {{ $value | humanizePercentage }}"
+
+      - alert: LowRedisHitRate
+        expr: |
+          rate(redis_keyspace_hits[5m])
+          /
+          (rate(redis_keyspace_hits[5m]) + rate(redis_keyspace_misses[5m])) < 0.9
+        for: 10m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "Redis命中率过低"
+          description: "Redis命中率低于90%，当前值: {{ $value | humanizePercentage }}"
+
+      # ==================== 系统资源告警 ====================
+      - alert: HighCPUUsage
+        expr: rate(process_cpu_seconds_total{job="room-inspection-backend"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "CPU使用率过高"
+          description: "实例 {{ $labels.instance }} CPU使用率超过80%，当前值: {{ $value | humanizePercentage }}"
+
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"}
+          /
+          node_filesystem_size_bytes{mountpoint="/"}) < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: ops
+        annotations:
+          summary: "磁盘空间不足"
+          description: "实例 {{ $labels.instance }} 磁盘空间不足10%，当前值: {{ $value | humanizePercentage }}"

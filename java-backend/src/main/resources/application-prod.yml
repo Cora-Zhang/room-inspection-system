@@ -1,0 +1,202 @@
+# 生产环境配置
+spring:
+  application:
+    name: room-inspection
+
+  # 数据源配置（读写分离）
+  shardingsphere:
+    datasource:
+      names: master,slave1,slave2
+      master:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        jdbc-url: jdbc:mysql://prod-db-master.internal:3306/room_inspection?useSSL=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+        username: prod_user
+        password: ${DB_PASSWORD}
+        hikari:
+          maximum-pool-size: 20
+          minimum-idle: 5
+          connection-timeout: 30000
+      slave1:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        jdbc-url: jdbc:mysql://prod-db-slave1.internal:3306/room_inspection?useSSL=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+        username: readonly_user
+        password: ${READONLY_PASSWORD}
+        hikari:
+          maximum-pool-size: 20
+          minimum-idle: 5
+          connection-timeout: 30000
+      slave2:
+        type: com.zaxxer.hikari.HikariDataSource
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        jdbc-url: jdbc:mysql://prod-db-slave2.internal:3306/room_inspection?useSSL=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8
+        username: readonly_user
+        password: ${READONLY_PASSWORD}
+        hikari:
+          maximum-pool-size: 20
+          minimum-idle: 5
+          connection-timeout: 30000
+    rules:
+      readwrite-splitting:
+        data-sources:
+          readwrite_ds:
+            write-data-source-name: master
+            read-data-source-names: slave1,slave2
+            load-balancer-name: round_robin
+        load-balancers:
+          round_robin:
+            type: ROUND_ROBIN
+
+  # Redis集群配置
+  redis:
+    cluster:
+      nodes:
+        - prod-redis-node1.internal:6379
+        - prod-redis-node2.internal:6379
+        - prod-redis-node3.internal:6379
+        - prod-redis-node4.internal:6379
+        - prod-redis-node5.internal:6379
+        - prod-redis-node6.internal:6379
+      max-redirects: 3
+    password: ${REDIS_PASSWORD}
+    timeout: 5000
+    lettuce:
+      pool:
+        max-active: 50
+        max-wait: -1
+        max-idle: 20
+        min-idle: 5
+
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.MySQL8Dialect
+
+# 服务器配置
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 20
+    max-connections: 1000
+    accept-count: 100
+
+# 日志配置
+logging:
+  level:
+    root: WARN
+    com.roominspection: INFO
+  file:
+    name: /var/log/room-inspection/application-prod.log
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+      total-size-cap: 10GB
+
+# MyBatis Plus配置
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: uuid
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 监控配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: ${spring.application.name}
+      env: prod
+
+# 应用配置
+app:
+  # JWT配置
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration: 28800000
+
+  # 文件上传配置
+  file:
+    upload-path: /opt/uploads
+    max-size: 100MB
+    allowed-types:
+      - image/jpeg
+      - image/png
+      - application/pdf
+
+  # 监控配置
+  monitor:
+    thread-pool:
+      core-size: 20
+      max-size: 50
+      queue-capacity: 500
+    # 监控采集配置
+    collection:
+      interval: 60
+      concurrent-devices: 200
+      timeout: 30
+
+  # 告警配置
+  alert:
+    enabled: true
+    channels:
+      - email
+      - dingtalk
+      - sms
+    email:
+      enabled: true
+      recipients:
+        - admin1@company.com
+        - admin2@company.com
+    dingtalk:
+      enabled: true
+      webhook: ${DINGTALK_WEBHOOK}
+      secret: ${DINGTALK_SECRET}
+    sms:
+      enabled: true
+      recipients:
+        - 13800138000
+
+  # SSO配置
+  sso:
+    enabled: true
+
+  # 数据库备份配置
+  backup:
+    enabled: true
+    path: /backup/mysql/prod
+    full-backup-cron: "0 0 2 * * ?"
+    incremental-backup-cron: "0 0 * * * ?"
+    retain-days: 30
+
+  # 集群配置
+  cluster:
+    enabled: true
+    instance-id: ${INSTANCE_ID:default}
+    zookeeper:
+      connect-string: ${ZOOKEEPER_CONNECT:zk1.internal:2181,zk2.internal:2181,zk3.internal:2181}
