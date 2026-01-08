@@ -1,1420 +1,722 @@
 -- ============================================
--- 机房巡检系统 - MySQL5.7 数据库初始化脚本
+-- 机房巡检系统 - 数据库初始化脚本
+-- 版本: v1.0.0
+-- 最后更新: 2024-01-20
+-- 数据库: MySQL 5.7+
 -- ============================================
 
--- 创建数据库
-CREATE DATABASE IF NOT EXISTS `room_inspection` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-
-USE `room_inspection`;
+-- 设置字符集
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
 
 -- ============================================
--- 用户和权限模块
+-- 用户与权限管理
 -- ============================================
 
--- 用户表
-CREATE TABLE IF NOT EXISTS `users` (
-  `id` varchar(36) NOT NULL COMMENT '用户ID',
+-- 1. 用户表
+DROP TABLE IF EXISTS `user`;
+CREATE TABLE `user` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '用户ID',
   `username` varchar(50) NOT NULL COMMENT '用户名',
+  `password` varchar(255) NOT NULL COMMENT '密码（BCrypt加密）',
+  `real_name` varchar(50) DEFAULT NULL COMMENT '真实姓名',
   `email` varchar(100) DEFAULT NULL COMMENT '邮箱',
-  `password` varchar(255) DEFAULT NULL COMMENT '密码',
-  `real_name` varchar(50) NOT NULL COMMENT '真实姓名',
-  `avatar` varchar(255) DEFAULT NULL COMMENT '头像URL',
   `phone` varchar(20) DEFAULT NULL COMMENT '手机号',
-  `department_id` varchar(36) DEFAULT NULL COMMENT '部门ID',
-  `position` varchar(50) DEFAULT NULL COMMENT '职位',
-  `employee_id` varchar(50) DEFAULT NULL COMMENT '员工工号',
-  `status` varchar(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '用户状态',
-  `source` varchar(20) NOT NULL DEFAULT 'LOCAL' COMMENT '用户来源',
-  `external_id` varchar(100) DEFAULT NULL COMMENT '外部系统ID',
-  `last_login_at` datetime DEFAULT NULL COMMENT '最后登录时间',
+  `department_id` bigint(20) DEFAULT NULL COMMENT '部门ID',
+  `job_id` bigint(20) DEFAULT NULL COMMENT '职位ID',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态：0-禁用，1-启用',
+  `last_login_time` datetime DEFAULT NULL COMMENT '最后登录时间',
   `last_login_ip` varchar(50) DEFAULT NULL COMMENT '最后登录IP',
-  `failed_login_count` int NOT NULL DEFAULT '0' COMMENT '失败登录次数',
-  `locked_until` datetime DEFAULT NULL COMMENT '锁定时间',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
+  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记：0-未删除，1-已删除',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_username` (`username`),
   UNIQUE KEY `uk_email` (`email`),
-  UNIQUE KEY `uk_employee_id` (`employee_id`),
-  KEY `idx_department_id` (`department_id`),
-  KEY `idx_status` (`status`),
-  KEY `idx_source` (`source`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+  KEY `idx_department` (`department_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
--- 部门表
-CREATE TABLE IF NOT EXISTS `departments` (
-  `id` varchar(36) NOT NULL COMMENT '部门ID',
-  `code` varchar(50) NOT NULL COMMENT '部门编码',
+-- 2. 部门表
+DROP TABLE IF EXISTS `department`;
+CREATE TABLE `department` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '部门ID',
   `name` varchar(100) NOT NULL COMMENT '部门名称',
-  `parent_id` varchar(36) DEFAULT NULL COMMENT '父部门ID',
-  `level` int NOT NULL DEFAULT '0' COMMENT '层级',
-  `path` varchar(500) DEFAULT NULL COMMENT '层级路径',
-  `sort` int NOT NULL DEFAULT '0' COMMENT '排序',
-  `description` varchar(500) DEFAULT NULL COMMENT '描述',
-  `status` varchar(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
-  `external_id` varchar(100) DEFAULT NULL COMMENT '外部系统ID',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_code` (`code`),
-  KEY `idx_parent_id` (`parent_id`),
-  KEY `idx_level` (`level`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='部门表';
-
--- 角色表
-CREATE TABLE IF NOT EXISTS `roles` (
-  `id` varchar(36) NOT NULL COMMENT '角色ID',
-  `code` varchar(50) NOT NULL COMMENT '角色编码',
-  `name` varchar(100) NOT NULL COMMENT '角色名称',
-  `description` varchar(500) DEFAULT NULL COMMENT '描述',
-  `department_id` varchar(36) DEFAULT NULL COMMENT '部门ID',
-  `is_system` tinyint(1) NOT NULL DEFAULT '0' COMMENT '系统内置角色',
-  `status` varchar(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_code` (`code`),
-  KEY `idx_department_id` (`department_id`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色表';
-
--- 权限表
-CREATE TABLE IF NOT EXISTS `permissions` (
-  `id` varchar(36) NOT NULL COMMENT '权限ID',
-  `code` varchar(100) NOT NULL COMMENT '权限编码',
-  `name` varchar(100) NOT NULL COMMENT '权限名称',
-  `type` varchar(20) NOT NULL COMMENT '权限类型',
-  `resource` varchar(50) DEFAULT NULL COMMENT '资源',
-  `action` varchar(50) DEFAULT NULL COMMENT '操作',
-  `description` varchar(500) DEFAULT NULL COMMENT '描述',
-  `status` varchar(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '状态',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_code` (`code`),
-  KEY `idx_type` (`type`),
-  KEY `idx_resource` (`resource`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='权限表';
-
--- 用户角色关联表
-CREATE TABLE IF NOT EXISTS `user_roles` (
-  `id` varchar(36) NOT NULL COMMENT 'ID',
-  `user_id` varchar(36) NOT NULL COMMENT '用户ID',
-  `role_id` varchar(36) NOT NULL COMMENT '角色ID',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_user_role` (`user_id`,`role_id`),
-  KEY `idx_role_id` (`role_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户角色关联表';
-
--- 角色权限关联表
-CREATE TABLE IF NOT EXISTS `role_permissions` (
-  `id` varchar(36) NOT NULL COMMENT 'ID',
-  `role_id` varchar(36) NOT NULL COMMENT '角色ID',
-  `permission_id` varchar(36) NOT NULL COMMENT '权限ID',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_role_permission` (`role_id`,`permission_id`),
-  KEY `idx_permission_id` (`permission_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='角色权限关联表';
-
--- ============================================
--- 机房和设备模块
--- ============================================
-
--- 机房表
-CREATE TABLE IF NOT EXISTS `rooms` (
-  `id` varchar(36) NOT NULL COMMENT '机房ID',
-  `code` varchar(50) NOT NULL COMMENT '机房编号',
-  `name` varchar(100) NOT NULL COMMENT '机房名称',
-  `type` varchar(20) NOT NULL COMMENT '机房类型',
-  `location` varchar(200) DEFAULT NULL COMMENT '位置',
-  `floor` varchar(50) DEFAULT NULL COMMENT '楼层',
-  `area` double DEFAULT NULL COMMENT '面积（平方米）',
-  `capacity` int DEFAULT NULL COMMENT '容量（机柜数）',
-  `manager_id` varchar(36) DEFAULT NULL COMMENT '负责人ID',
-  `admin_id` varchar(36) DEFAULT NULL COMMENT '管理员ID',
+  `code` varchar(50) DEFAULT NULL COMMENT '部门编码',
+  `parent_id` bigint(20) DEFAULT '0' COMMENT '上级部门ID',
+  `level` int(11) DEFAULT '1' COMMENT '部门层级',
+  `sort` int(11) DEFAULT '0' COMMENT '排序',
+  `leader` varchar(50) DEFAULT NULL COMMENT '负责人',
   `phone` varchar(20) DEFAULT NULL COMMENT '联系电话',
-  `status` varchar(20) NOT NULL DEFAULT 'NORMAL' COMMENT '机房状态',
-  `temperature_threshold` double DEFAULT NULL COMMENT '温度阈值（℃）',
-  `humidity_threshold` double DEFAULT NULL COMMENT '湿度阈值（%）',
   `description` varchar(500) DEFAULT NULL COMMENT '描述',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态：0-禁用，1-启用',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  KEY `idx_parent` (`parent_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门表';
+
+-- 3. 职位表
+DROP TABLE IF EXISTS `job`;
+CREATE TABLE `job` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '职位ID',
+  `name` varchar(50) NOT NULL COMMENT '职位名称',
+  `code` varchar(50) DEFAULT NULL COMMENT '职位编码',
+  `department_id` bigint(20) DEFAULT NULL COMMENT '部门ID',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `sort` int(11) DEFAULT '0' COMMENT '排序',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  KEY `idx_department` (`department_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='职位表';
+
+-- 4. 角色表
+DROP TABLE IF EXISTS `role`;
+CREATE TABLE `role` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '角色ID',
+  `name` varchar(50) NOT NULL COMMENT '角色名称',
+  `code` varchar(50) DEFAULT NULL COMMENT '角色编码',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `data_scope` tinyint(1) DEFAULT '1' COMMENT '数据范围：1-全部，2-本部门，3-本部门及以下，4-仅本人',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色表';
+
+-- 5. 用户角色关联表
+DROP TABLE IF EXISTS `user_role`;
+CREATE TABLE `user_role` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `user_id` bigint(20) NOT NULL COMMENT '用户ID',
+  `role_id` bigint(20) NOT NULL COMMENT '角色ID',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_role` (`user_id`, `role_id`),
+  KEY `idx_role` (`role_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户角色关联表';
+
+-- 6. 权限表
+DROP TABLE IF EXISTS `permission`;
+CREATE TABLE `permission` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '权限ID',
+  `name` varchar(50) NOT NULL COMMENT '权限名称',
+  `code` varchar(100) NOT NULL COMMENT '权限编码',
+  `type` tinyint(1) DEFAULT '1' COMMENT '类型：1-菜单，2-按钮',
+  `parent_id` bigint(20) DEFAULT '0' COMMENT '上级权限ID',
+  `path` varchar(200) DEFAULT NULL COMMENT '路由路径',
+  `component` varchar(200) DEFAULT NULL COMMENT '组件路径',
+  `icon` varchar(100) DEFAULT NULL COMMENT '图标',
+  `sort` int(11) DEFAULT '0' COMMENT '排序',
+  `visible` tinyint(1) DEFAULT '1' COMMENT '是否显示：0-隐藏，1-显示',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_code` (`code`),
-  KEY `idx_type` (`type`),
-  KEY `idx_status` (`status`),
-  KEY `idx_manager_id` (`manager_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='机房表';
+  KEY `idx_parent` (`parent_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='权限表';
 
--- 设备表
-CREATE TABLE IF NOT EXISTS `devices` (
-  `id` varchar(36) NOT NULL COMMENT '设备ID',
-  `code` varchar(50) NOT NULL COMMENT '设备编号',
+-- 7. 角色权限关联表
+DROP TABLE IF EXISTS `role_permission`;
+CREATE TABLE `role_permission` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT,
+  `role_id` bigint(20) NOT NULL COMMENT '角色ID',
+  `permission_id` bigint(20) NOT NULL COMMENT '权限ID',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_role_permission` (`role_id`, `permission_id`),
+  KEY `idx_permission` (`permission_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色权限关联表';
+
+-- ============================================
+-- 机房与设备管理
+-- ============================================
+
+-- 8. 数据中心表
+DROP TABLE IF EXISTS `data_center`;
+CREATE TABLE `data_center` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '数据中心ID',
+  `name` varchar(100) NOT NULL COMMENT '数据中心名称',
+  `code` varchar(50) DEFAULT NULL COMMENT '数据中心编码',
+  `location` varchar(200) DEFAULT NULL COMMENT '地理位置',
+  `address` varchar(300) DEFAULT NULL COMMENT '详细地址',
+  `contact_person` varchar(50) DEFAULT NULL COMMENT '联系人',
+  `contact_phone` varchar(20) DEFAULT NULL COMMENT '联系电话',
+  `api_endpoint` varchar(200) DEFAULT NULL COMMENT 'API端点',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态：0-禁用，1-启用',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='数据中心表';
+
+-- 9. 机房表
+DROP TABLE IF EXISTS `room`;
+CREATE TABLE `room` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '机房ID',
+  `name` varchar(100) NOT NULL COMMENT '机房名称',
+  `code` varchar(50) DEFAULT NULL COMMENT '机房编码',
+  `data_center_id` bigint(20) DEFAULT NULL COMMENT '数据中心ID',
+  `floor` int(11) DEFAULT NULL COMMENT '楼层',
+  `location` varchar(200) DEFAULT NULL COMMENT '位置',
+  `area` decimal(10,2) DEFAULT NULL COMMENT '面积（平方米）',
+  `capacity` int(11) DEFAULT NULL COMMENT '设备容量',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`),
+  KEY `idx_data_center` (`data_center_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='机房表';
+
+-- 10. 设备表
+DROP TABLE IF EXISTS `device`;
+CREATE TABLE `device` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '设备ID',
   `name` varchar(100) NOT NULL COMMENT '设备名称',
-  `type` varchar(50) NOT NULL COMMENT '设备类型',
-  `brand` varchar(50) DEFAULT NULL COMMENT '品牌',
+  `code` varchar(50) DEFAULT NULL COMMENT '设备编码',
+  `type` varchar(50) DEFAULT NULL COMMENT '设备类型',
+  `room_id` bigint(20) DEFAULT NULL COMMENT '机房ID',
+  `location_id` bigint(20) DEFAULT NULL COMMENT '位置ID',
+  `ip` varchar(50) DEFAULT NULL COMMENT 'IP地址',
+  `mac` varchar(50) DEFAULT NULL COMMENT 'MAC地址',
+  `manufacturer` varchar(100) DEFAULT NULL COMMENT '厂商',
   `model` varchar(100) DEFAULT NULL COMMENT '型号',
   `serial_number` varchar(100) DEFAULT NULL COMMENT '序列号',
-  `room_id` varchar(36) DEFAULT NULL COMMENT '机房ID',
-  `rack_code` varchar(50) DEFAULT NULL COMMENT '机柜编号',
-  `u_position` int DEFAULT NULL COMMENT 'U位',
-  `ip_address` varchar(50) DEFAULT NULL COMMENT 'IP地址',
-  `mac_address` varchar(50) DEFAULT NULL COMMENT 'MAC地址',
-  `protocol` varchar(20) DEFAULT NULL COMMENT '监控协议',
-  `monitor_params` text DEFAULT NULL COMMENT '监控参数',
-  `access_control_device_id` varchar(100) DEFAULT NULL COMMENT '门禁设备ID',
-  `status` varchar(20) NOT NULL DEFAULT 'ONLINE' COMMENT '设备状态',
-  `manager_id` varchar(36) DEFAULT NULL COMMENT '负责人ID',
-  `purchase_date` datetime DEFAULT NULL COMMENT '采购日期',
-  `warranty_expire_date` datetime DEFAULT NULL COMMENT '保修到期日期',
+  `status` varchar(20) DEFAULT 'NORMAL' COMMENT '状态：NORMAL-正常，WARNING-警告，ERROR-异常，OFFLINE-离线',
+  `install_date` date DEFAULT NULL COMMENT '安装日期',
+  `warranty_date` date DEFAULT NULL COMMENT '保修到期日',
+  `next_maintenance_date` date DEFAULT NULL COMMENT '下次维护日期',
   `description` varchar(500) DEFAULT NULL COMMENT '描述',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_code` (`code`),
-  KEY `idx_room_id` (`room_id`),
+  KEY `idx_room` (`room_id`),
   KEY `idx_type` (`type`),
-  KEY `idx_status` (`status`),
-  KEY `idx_protocol` (`protocol`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='设备表';
-
--- ============================================
--- 巡检模块
--- ============================================
-
--- 巡检记录表
-CREATE TABLE IF NOT EXISTS `inspections` (
-  `id` varchar(36) NOT NULL COMMENT '巡检ID',
-  `code` varchar(50) NOT NULL COMMENT '巡检编号',
-  `room_id` varchar(36) NOT NULL COMMENT '机房ID',
-  `room_name` varchar(100) DEFAULT NULL COMMENT '机房名称',
-  `inspector_id` varchar(36) NOT NULL COMMENT '巡检人ID',
-  `inspector_name` varchar(50) DEFAULT NULL COMMENT '巡检人姓名',
-  `shift` varchar(20) NOT NULL COMMENT '班次：DAY-白班，NIGHT-夜班',
-  `inspection_date` datetime NOT NULL COMMENT '巡检日期',
-  `start_time` datetime DEFAULT NULL COMMENT '开始时间',
-  `end_time` datetime DEFAULT NULL COMMENT '结束时间',
-  `temperature` double DEFAULT NULL COMMENT '温度（℃）',
-  `humidity` double DEFAULT NULL COMMENT '湿度（%）',
-  `result` varchar(20) DEFAULT NULL COMMENT '巡检结果',
-  `status` varchar(20) NOT NULL DEFAULT 'PENDING' COMMENT '巡检状态',
-  `issue_count` int NOT NULL DEFAULT '0' COMMENT '发现问题数量',
-  `issues` text DEFAULT NULL COMMENT '问题描述',
-  `suggestions` text DEFAULT NULL COMMENT '处理建议',
-  `photos` text DEFAULT NULL COMMENT '照片URL列表',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_code` (`code`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_inspector_id` (`inspector_id`),
-  KEY `idx_shift` (`shift`),
-  KEY `idx_inspection_date` (`inspection_date`),
-  KEY `idx_status` (`status`),
-  KEY `idx_result` (`result`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='巡检记录表';
-
--- ============================================
--- 值班管理模块
--- ============================================
-
--- 值班人员表
-CREATE TABLE IF NOT EXISTS `staffs` (
-  `id` varchar(36) NOT NULL COMMENT '值班人员ID',
-  `employee_id` varchar(50) NOT NULL COMMENT '员工工号',
-  `name` varchar(50) NOT NULL COMMENT '姓名',
-  `department` varchar(100) DEFAULT NULL COMMENT '部门',
-  `position` varchar(50) DEFAULT NULL COMMENT '职位',
-  `phone` varchar(20) DEFAULT NULL COMMENT '手机号',
-  `email` varchar(100) DEFAULT NULL COMMENT '邮箱',
-  `status` varchar(20) NOT NULL DEFAULT 'ACTIVE' COMMENT '人员状态',
-  `joined_date` datetime DEFAULT NULL COMMENT '入职日期',
-  `skills` varchar(500) DEFAULT NULL COMMENT '技能',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_employee_id` (`employee_id`),
   KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='值班人员表';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备表';
 
--- 值班排班表
-CREATE TABLE IF NOT EXISTS `shift_schedules` (
-  `id` varchar(36) NOT NULL COMMENT '排班ID',
-  `schedule_date` date NOT NULL COMMENT '值班日期',
-  `shift` varchar(20) NOT NULL COMMENT '班次：DAY-白班，NIGHT-夜班',
-  `staff_id` varchar(36) NOT NULL COMMENT '值班人员ID',
-  `staff_name` varchar(50) DEFAULT NULL COMMENT '值班人员姓名',
-  `room_id` varchar(36) DEFAULT NULL COMMENT '责任机房ID',
-  `room_name` varchar(100) DEFAULT NULL COMMENT '责任机房名称',
-  `status` varchar(20) NOT NULL DEFAULT 'SCHEDULED' COMMENT '排班状态',
-  `actual_start_time` datetime DEFAULT NULL COMMENT '实际开始时间',
-  `actual_end_time` datetime DEFAULT NULL COMMENT '实际结束时间',
-  `data_source` int NOT NULL DEFAULT '1' COMMENT '数据来源（1-手动创建 2-Excel导入 3-钉钉同步）',
-  `import_batch` varchar(50) DEFAULT NULL COMMENT '导入批次号',
-  `sync_dingtalk_status` int DEFAULT '0' COMMENT '钉钉同步状态（0-未同步 1-已同步 2-同步失败）',
-  `dingtalk_task_id` varchar(100) DEFAULT NULL COMMENT '钉钉任务ID',
-  `schedule_type` int DEFAULT NULL COMMENT '周期性排班类型（null-非周期性 1-每周轮换 2-每月轮换 3-季度轮换）',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除标志',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+-- 11. 设备位置表
+DROP TABLE IF EXISTS `device_location`;
+CREATE TABLE `device_location` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '位置ID',
+  `room_id` bigint(20) NOT NULL COMMENT '机房ID',
+  `name` varchar(100) DEFAULT NULL COMMENT '位置名称',
+  `x_coordinate` decimal(10,2) DEFAULT NULL COMMENT 'X坐标',
+  `y_coordinate` decimal(10,2) DEFAULT NULL COMMENT 'Y坐标',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_schedule` (`schedule_date`,`shift`,`room_id`),
-  KEY `idx_staff_id` (`staff_id`),
-  KEY `idx_room_id` (`room_id`),
+  KEY `idx_room` (`room_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备位置表';
+
+-- ============================================
+-- 巡检管理
+-- ============================================
+
+-- 12. 巡检模板表
+DROP TABLE IF EXISTS `inspection_template`;
+CREATE TABLE `inspection_template` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '模板ID',
+  `name` varchar(100) NOT NULL COMMENT '模板名称',
+  `code` varchar(50) DEFAULT NULL COMMENT '模板编码',
+  `type` varchar(50) DEFAULT 'REGULAR' COMMENT '类型：REGULAR-日常，SPECIAL-专项，EMERGENCY-应急',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='巡检模板表';
+
+-- 13. 巡检模板项表
+DROP TABLE IF EXISTS `inspection_template_item`;
+CREATE TABLE `inspection_template_item` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '模板项ID',
+  `template_id` bigint(20) NOT NULL COMMENT '模板ID',
+  `item_name` varchar(100) NOT NULL COMMENT '项目名称',
+  `item_type` varchar(20) NOT NULL COMMENT '项目类型：NUMERIC-数值，STATUS-状态，TEXT-文本，IMAGE-图片',
+  `default_value` varchar(200) DEFAULT NULL COMMENT '默认值',
+  `required` tinyint(1) DEFAULT '0' COMMENT '是否必填：0-否，1-是',
+  `validation_rule` varchar(200) DEFAULT NULL COMMENT '验证规则',
+  `sort` int(11) DEFAULT '0' COMMENT '排序',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  KEY `idx_template` (`template_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='巡检模板项表';
+
+-- 14. 巡检记录表
+DROP TABLE IF EXISTS `inspection`;
+CREATE TABLE `inspection` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '巡检ID',
+  `name` varchar(100) NOT NULL COMMENT '巡检名称',
+  `template_id` bigint(20) DEFAULT NULL COMMENT '模板ID',
+  `room_id` bigint(20) DEFAULT NULL COMMENT '机房ID',
+  `inspector_id` bigint(20) DEFAULT NULL COMMENT '巡检人ID',
+  `planned_time` datetime DEFAULT NULL COMMENT '计划时间',
+  `actual_time` datetime DEFAULT NULL COMMENT '实际开始时间',
+  `end_time` datetime DEFAULT NULL COMMENT '实际结束时间',
+  `status` varchar(20) DEFAULT 'PLANNED' COMMENT '状态：PLANNED-计划中，IN_PROGRESS-进行中，COMPLETED-已完成，CANCELLED-已取消',
+  `result` varchar(20) DEFAULT NULL COMMENT '结果：NORMAL-正常，WARNING-警告，ERROR-异常',
+  `summary` text COMMENT '总结',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  KEY `idx_template` (`template_id`),
+  KEY `idx_room` (`room_id`),
+  KEY `idx_inspector` (`inspector_id`),
   KEY `idx_status` (`status`),
-  KEY `idx_data_source` (`data_source`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='值班排班表';
+  KEY `idx_planned_time` (`planned_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='巡检记录表';
 
--- 值班交接记录表
-CREATE TABLE IF NOT EXISTS `shift_handovers` (
-  `id` varchar(36) NOT NULL COMMENT '交接记录ID',
-  `code` varchar(50) NOT NULL COMMENT '交接编号',
-  `handover_date` date NOT NULL COMMENT '交接日期',
-  `shift` varchar(20) NOT NULL COMMENT '班次',
-  `room_id` varchar(36) DEFAULT NULL COMMENT '责任机房ID',
-  `room_name` varchar(100) DEFAULT NULL COMMENT '责任机房名称',
-  `outgoing_staff_id` varchar(36) NOT NULL COMMENT '交班人ID',
-  `outgoing_staff_name` varchar(50) DEFAULT NULL COMMENT '交班人姓名',
-  `incoming_staff_id` varchar(36) NOT NULL COMMENT '接班人ID',
-  `incoming_staff_name` varchar(50) DEFAULT NULL COMMENT '接班人姓名',
-  `outgoing_time` datetime DEFAULT NULL COMMENT '交班时间',
-  `incoming_time` datetime DEFAULT NULL COMMENT '接班时间',
-  `tasks` text DEFAULT NULL COMMENT '完成任务列表',
-  `issues` text DEFAULT NULL COMMENT '待处理问题列表',
-  `equipment_status` text DEFAULT NULL COMMENT '设备状态',
-  `handover_content` text DEFAULT NULL COMMENT '交接内容',
-  `incoming_confirmed` tinyint(1) DEFAULT '0' COMMENT '接班确认',
-  `access_records` text DEFAULT NULL COMMENT '门禁刷卡记录',
-  `is_abnormal` tinyint(1) DEFAULT '0' COMMENT '是否异常',
-  `abnormal_reason` varchar(500) DEFAULT NULL COMMENT '异常原因',
-  `is_reminded` tinyint(1) DEFAULT '0' COMMENT '是否已发送交接提醒',
-  `remind_time` datetime DEFAULT NULL COMMENT '提醒发送时间',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除标志',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+-- 15. 设备巡检记录表
+DROP TABLE IF EXISTS `device_inspection_record`;
+CREATE TABLE `device_inspection_record` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '记录ID',
+  `inspection_id` bigint(20) NOT NULL COMMENT '巡检ID',
+  `device_id` bigint(20) NOT NULL COMMENT '设备ID',
+  `item_name` varchar(100) NOT NULL COMMENT '检查项名称',
+  `item_type` varchar(20) NOT NULL COMMENT '检查项类型',
+  `value` varchar(500) DEFAULT NULL COMMENT '检查值',
+  `status` varchar(20) DEFAULT 'NORMAL' COMMENT '状态',
+  `remarks` varchar(500) DEFAULT NULL COMMENT '备注',
+  `photo_url` varchar(500) DEFAULT NULL COMMENT '照片URL',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_code` (`code`),
-  KEY `idx_handover_date` (`handover_date`),
-  KEY `idx_shift` (`shift`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_outgoing_staff_id` (`outgoing_staff_id`),
-  KEY `idx_incoming_staff_id` (`incoming_staff_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='值班交接记录表';
+  KEY `idx_inspection` (`inspection_id`),
+  KEY `idx_device` (`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备巡检记录表';
 
--- 门禁权限表
-CREATE TABLE IF NOT EXISTS `door_access_permission` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '权限ID',
-  `staff_id` bigint NOT NULL COMMENT '值班人员ID',
-  `staff_name` varchar(50) DEFAULT NULL COMMENT '值班人员姓名',
-  `staff_no` varchar(50) DEFAULT NULL COMMENT '值班人员工号',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `room_name` varchar(100) DEFAULT NULL COMMENT '机房名称',
-  `device_id` varchar(100) DEFAULT NULL COMMENT '门禁设备ID',
-  `card_no` varchar(50) DEFAULT NULL COMMENT '门禁卡号',
-  `permission_type` int NOT NULL DEFAULT '1' COMMENT '权限类型（1-值班权限 2-临时权限）',
-  `effective_start_time` datetime NOT NULL COMMENT '生效开始时间',
-  `effective_end_time` datetime NOT NULL COMMENT '生效结束时间',
-  `status` int NOT NULL DEFAULT '0' COMMENT '权限状态（0-未生效 1-生效中 2-已过期 3-已回收）',
-  `sync_status` int NOT NULL DEFAULT '0' COMMENT '下发状态（0-未下发 1-已下发 2-下发失败）',
-  `sync_time` datetime DEFAULT NULL COMMENT '下发时间',
-  `door_system_type` int DEFAULT NULL COMMENT '门禁系统类型（1-海康 2-大华）',
-  `revoke_time` datetime DEFAULT NULL COMMENT '回收时间',
-  `revoke_reason` varchar(500) DEFAULT NULL COMMENT '回收原因',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除标志',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+-- 16. 巡检验证表
+DROP TABLE IF EXISTS `inspection_verification`;
+CREATE TABLE `inspection_verification` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '验证ID',
+  `inspection_id` bigint(20) NOT NULL COMMENT '巡检ID',
+  `type` varchar(20) NOT NULL COMMENT '验证类型：PHOTO-拍照，LOCATION-定位，SIGNATURE-签名',
+  `data` text COMMENT '验证数据',
+  `verified` tinyint(1) DEFAULT '0' COMMENT '是否已验证',
+  `verify_time` datetime DEFAULT NULL COMMENT '验证时间',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
   PRIMARY KEY (`id`),
-  KEY `idx_staff_id` (`staff_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_device_id` (`device_id`),
-  KEY `idx_permission_type` (`permission_type`),
-  KEY `idx_status` (`status`),
-  KEY `idx_effective_time` (`effective_start_time`, `effective_end_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='门禁权限表';
+  KEY `idx_inspection` (`inspection_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='巡检验证表';
 
--- 临时门禁权限申请表
-CREATE TABLE IF NOT EXISTS `temp_access_request` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '申请ID',
-  `applicant_no` varchar(50) NOT NULL COMMENT '申请人工号',
-  `applicant_name` varchar(50) NOT NULL COMMENT '申请人姓名',
-  `department` varchar(100) DEFAULT NULL COMMENT '申请人部门',
-  `phone` varchar(20) DEFAULT NULL COMMENT '申请人联系电话',
-  `room_id` bigint DEFAULT NULL COMMENT '访问机房ID',
-  `room_name` varchar(100) DEFAULT NULL COMMENT '访问机房名称',
-  `reason` text DEFAULT NULL COMMENT '访问事由',
-  `access_start_time` datetime NOT NULL COMMENT '访问开始时间',
-  `access_end_time` datetime NOT NULL COMMENT '访问结束时间',
-  `approval_status` int NOT NULL DEFAULT '0' COMMENT '审批状态（0-待审批 1-审批通过 2-审批拒绝 3-已撤销）',
-  `approver_id` bigint DEFAULT NULL COMMENT '审批人ID',
-  `approver_name` varchar(50) DEFAULT NULL COMMENT '审批人姓名',
-  `approval_time` datetime DEFAULT NULL COMMENT '审批时间',
-  `approval_comment` varchar(500) DEFAULT NULL COMMENT '审批意见',
-  `sync_status` int NOT NULL DEFAULT '0' COMMENT '权限下发状态（0-未下发 1-已下发 2-下发失败）',
-  `effective_status` int NOT NULL DEFAULT '0' COMMENT '权限生效状态（0-未生效 1-生效中 2-已过期 3-已回收）',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  `deleted` int NOT NULL DEFAULT '0' COMMENT '逻辑删除标志',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+-- 17. 巡检报告表
+DROP TABLE IF EXISTS `inspection_report`;
+CREATE TABLE `inspection_report` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '报告ID',
+  `inspection_id` bigint(20) NOT NULL COMMENT '巡检ID',
+  `report_date` date NOT NULL COMMENT '报告日期',
+  `room_count` int(11) DEFAULT '0' COMMENT '机房数量',
+  `device_count` int(11) DEFAULT '0' COMMENT '设备数量',
+  `normal_count` int(11) DEFAULT '0' COMMENT '正常数量',
+  `warning_count` int(11) DEFAULT '0' COMMENT '警告数量',
+  `error_count` int(11) DEFAULT '0' COMMENT '异常数量',
+  `summary` text COMMENT '总结',
+  `recommendations` text COMMENT '建议',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
   PRIMARY KEY (`id`),
-  KEY `idx_applicant_no` (`applicant_no`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_approval_status` (`approval_status`),
-  KEY `idx_access_time` (`access_start_time`, `access_end_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='临时门禁权限申请表';
+  UNIQUE KEY `uk_inspection` (`inspection_id`),
+  KEY `idx_report_date` (`report_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='巡检报告表';
 
 -- ============================================
--- 系统配置模块
+-- 告警管理
 -- ============================================
 
--- SSO配置表
-CREATE TABLE IF NOT EXISTS `sso_config` (
-  `id` varchar(36) NOT NULL COMMENT '配置ID',
-  `provider_code` varchar(50) NOT NULL COMMENT 'SSO提供商编码',
-  `provider_name` varchar(100) NOT NULL COMMENT 'SSO提供商名称',
-  `client_id` varchar(200) NOT NULL COMMENT '客户端ID',
-  `client_secret` varchar(200) NOT NULL COMMENT '客户端密钥',
-  `authorization_uri` varchar(500) NOT NULL COMMENT '授权URI',
-  `token_uri` varchar(500) NOT NULL COMMENT '令牌URI',
-  `user_info_uri` varchar(500) NOT NULL COMMENT '用户信息URI',
-  `jwk_set_uri` varchar(500) DEFAULT NULL COMMENT 'JWK集合URI',
-  `redirect_uri` varchar(500) NOT NULL COMMENT '回调URI',
-  `scopes` varchar(500) DEFAULT NULL COMMENT '授权范围',
-  `enabled` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用',
-  `data_sync_enabled` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否启用数据同步',
-  `sync_api_url` varchar(500) DEFAULT NULL COMMENT '数据同步API地址',
-  `sync_api_key` varchar(200) DEFAULT NULL COMMENT '数据同步API密钥',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+-- 18. 告警规则表
+DROP TABLE IF EXISTS `alert_rule`;
+CREATE TABLE `alert_rule` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '规则ID',
+  `name` varchar(100) NOT NULL COMMENT '规则名称',
+  `metric_name` varchar(100) NOT NULL COMMENT '指标名称',
+  `operator` varchar(10) NOT NULL COMMENT '操作符：>,<,=,>=,<=,!=',
+  `threshold` decimal(10,2) NOT NULL COMMENT '阈值',
+  `level` varchar(20) DEFAULT 'INFO' COMMENT '告警级别：INFO,WARNING,CRITICAL',
+  `duration` int(11) DEFAULT '0' COMMENT '持续时间（秒）',
+  `enabled` tinyint(1) DEFAULT '1' COMMENT '是否启用',
+  `channels` varchar(200) DEFAULT NULL COMMENT '通知渠道',
+  `recipients` varchar(500) DEFAULT NULL COMMENT '接收人',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_provider_code` (`provider_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='SSO配置表';
+  KEY `idx_metric` (`metric_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='告警规则表';
 
--- ============================================
--- 监控和告警模块
--- ============================================
-
--- 告警记录表
-CREATE TABLE IF NOT EXISTS `alerts` (
-  `id` varchar(36) NOT NULL COMMENT '告警ID',
-  `code` varchar(50) NOT NULL COMMENT '告警编号',
-  `type` varchar(50) NOT NULL COMMENT '告警类型',
-  `level` varchar(20) NOT NULL COMMENT '告警级别',
-  `source` varchar(50) DEFAULT NULL COMMENT '告警来源',
-  `device_id` varchar(36) DEFAULT NULL COMMENT '设备ID',
-  `device_name` varchar(100) DEFAULT NULL COMMENT '设备名称',
-  `room_id` varchar(36) DEFAULT NULL COMMENT '机房ID',
-  `title` varchar(200) NOT NULL COMMENT '告警标题',
-  `content` text NOT NULL COMMENT '告警内容',
-  `status` varchar(20) NOT NULL DEFAULT 'PENDING' COMMENT '告警状态',
-  `alert_time` datetime NOT NULL COMMENT '告警时间',
-  `ack_time` datetime DEFAULT NULL COMMENT '确认时间',
+-- 19. 告警记录表
+DROP TABLE IF EXISTS `alarm_record`;
+CREATE TABLE `alarm_record` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '告警ID',
+  `rule_id` bigint(20) DEFAULT NULL COMMENT '规则ID',
+  `device_id` bigint(20) DEFAULT NULL COMMENT '设备ID',
+  `metric_name` varchar(100) DEFAULT NULL COMMENT '指标名称',
+  `level` varchar(20) DEFAULT 'INFO' COMMENT '告警级别',
+  `content` varchar(500) DEFAULT NULL COMMENT '告警内容',
+  `value` varchar(100) DEFAULT NULL COMMENT '当前值',
+  `threshold` varchar(100) DEFAULT NULL COMMENT '阈值',
+  `status` varchar(20) DEFAULT 'PENDING' COMMENT '状态：PENDING-待处理，PROCESSING-处理中，RESOLVED-已解决，CLOSED-已关闭',
+  `handler_id` bigint(20) DEFAULT NULL COMMENT '处理人ID',
   `handle_time` datetime DEFAULT NULL COMMENT '处理时间',
-  `handler_id` varchar(36) DEFAULT NULL COMMENT '处理人ID',
-  `handler_name` varchar(50) DEFAULT NULL COMMENT '处理人姓名',
-  `handle_result` text DEFAULT NULL COMMENT '处理结果',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `handle_remark` varchar(500) DEFAULT NULL COMMENT '处理备注',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_code` (`code`),
-  KEY `idx_type` (`type`),
+  KEY `idx_device` (`device_id`),
   KEY `idx_level` (`level`),
-  KEY `idx_device_id` (`device_id`),
-  KEY `idx_room_id` (`room_id`),
   KEY `idx_status` (`status`),
-  KEY `idx_alert_time` (`alert_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='告警记录表';
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='告警记录表';
 
 -- ============================================
--- 插入初始数据
+-- 监控采集
 -- ============================================
 
--- 插入默认管理员用户
-INSERT INTO `users` (`id`, `username`, `password`, `real_name`, `status`, `source`) VALUES
-('admin-id', 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', 'ACTIVE', 'LOCAL');
+-- 20. 监控配置表
+DROP TABLE IF EXISTS `monitor_config`;
+CREATE TABLE `monitor_config` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '配置ID',
+  `device_id` bigint(20) NOT NULL COMMENT '设备ID',
+  `protocol` varchar(50) NOT NULL COMMENT '协议：SNMP,Modbus,BMS等',
+  `config_json` text COMMENT '配置JSON',
+  `enabled` tinyint(1) DEFAULT '1' COMMENT '是否启用',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  KEY `idx_device` (`device_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控配置表';
+
+-- 21. 监控任务表
+DROP TABLE IF EXISTS `monitor_task`;
+CREATE TABLE `monitor_task` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '任务ID',
+  `device_id` bigint(20) NOT NULL COMMENT '设备ID',
+  `task_name` varchar(100) DEFAULT NULL COMMENT '任务名称',
+  `interval` int(11) DEFAULT '60' COMMENT '采集间隔（秒）',
+  `enabled` tinyint(1) DEFAULT '1' COMMENT '是否启用',
+  `last_execute_time` datetime DEFAULT NULL COMMENT '最后执行时间',
+  `next_execute_time` datetime DEFAULT NULL COMMENT '下次执行时间',
+  `status` varchar(20) DEFAULT 'IDLE' COMMENT '状态：IDLE-空闲，RUNNING-运行中',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  KEY `idx_device` (`device_id`),
+  KEY `idx_status` (`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='监控任务表';
+
+-- 22. 设备指标表
+DROP TABLE IF EXISTS `device_metric`;
+CREATE TABLE `device_metric` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '指标ID',
+  `device_id` bigint(20) NOT NULL COMMENT '设备ID',
+  `metric_name` varchar(100) NOT NULL COMMENT '指标名称',
+  `metric_value` decimal(10,2) DEFAULT NULL COMMENT '指标值',
+  `unit` varchar(20) DEFAULT NULL COMMENT '单位',
+  `collect_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '采集时间',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_device_metric` (`device_id`, `metric_name`),
+  KEY `idx_collect_time` (`collect_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='设备指标表';
+
+-- 23. 采集节点表
+DROP TABLE IF EXISTS `collector_node`;
+CREATE TABLE `collector_node` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '节点ID',
+  `node_id` varchar(50) NOT NULL COMMENT '节点ID',
+  `node_name` varchar(100) DEFAULT NULL COMMENT '节点名称',
+  `ip` varchar(50) DEFAULT NULL COMMENT 'IP地址',
+  `port` int(11) DEFAULT NULL COMMENT '端口',
+  `status` varchar(20) DEFAULT 'ONLINE' COMMENT '状态：ONLINE,OFFLINE',
+  `device_count` int(11) DEFAULT '0' COMMENT '设备数量',
+  `heartbeat_time` datetime DEFAULT NULL COMMENT '心跳时间',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_node_id` (`node_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采集节点表';
+
+-- 24. 采集任务表
+DROP TABLE IF EXISTS `collection_task`;
+CREATE TABLE `collection_task` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '任务ID',
+  `task_name` varchar(100) DEFAULT NULL COMMENT '任务名称',
+  `node_id` varchar(50) DEFAULT NULL COMMENT '节点ID',
+  `device_ids` text COMMENT '设备ID列表',
+  `interval` int(11) DEFAULT '60' COMMENT '采集间隔（秒）',
+  `status` varchar(20) DEFAULT 'ACTIVE' COMMENT '状态：ACTIVE,PAUSED,STOPPED',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  KEY `idx_node` (`node_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='采集任务表';
+
+-- ============================================
+-- 值班管理
+-- ============================================
+
+-- 25. 班次计划表
+DROP TABLE IF EXISTS `shift_schedule`;
+CREATE TABLE `shift_schedule` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '计划ID',
+  `name` varchar(100) DEFAULT NULL COMMENT '计划名称',
+  `start_date` date NOT NULL COMMENT '开始日期',
+  `end_date` date NOT NULL COMMENT '结束日期',
+  `shift_type` varchar(20) DEFAULT NULL COMMENT '班次类型：DAY, NIGHT, MORNING, AFTERNOON',
+  `staff_ids` text COMMENT '员工ID列表',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  KEY `idx_date` (`start_date`, `end_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='班次计划表';
+
+-- ============================================
+-- SSO与数据同步
+-- ============================================
+
+-- 26. OAuth2令牌表
+DROP TABLE IF EXISTS `oauth2_token`;
+CREATE TABLE `oauth2_token` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '令牌ID',
+  `provider` varchar(50) NOT NULL COMMENT '提供商',
+  `access_token` varchar(500) DEFAULT NULL COMMENT '访问令牌',
+  `refresh_token` varchar(500) DEFAULT NULL COMMENT '刷新令牌',
+  `expires_in` int(11) DEFAULT NULL COMMENT '过期时间（秒）',
+  `user_id` bigint(20) DEFAULT NULL COMMENT '用户ID',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  KEY `idx_user` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='OAuth2令牌表';
+
+-- 27. IAM用户表
+DROP TABLE IF EXISTS `iam_user`;
+CREATE TABLE `iam_user` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'IAM用户ID',
+  `iam_user_id` varchar(100) NOT NULL COMMENT 'IAM系统用户ID',
+  `username` varchar(50) NOT NULL COMMENT '用户名',
+  `real_name` varchar(50) DEFAULT NULL COMMENT '真实姓名',
+  `email` varchar(100) DEFAULT NULL COMMENT '邮箱',
+  `phone` varchar(20) DEFAULT NULL COMMENT '手机号',
+  `organization_id` varchar(100) DEFAULT NULL COMMENT '组织ID',
+  `job_id` varchar(100) DEFAULT NULL COMMENT '职位ID',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_iam_user_id` (`iam_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='IAM用户表';
+
+-- 28. 组织表
+DROP TABLE IF EXISTS `organization`;
+CREATE TABLE `organization` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '组织ID',
+  `org_id` varchar(100) NOT NULL COMMENT 'IAM组织ID',
+  `name` varchar(100) NOT NULL COMMENT '组织名称',
+  `code` varchar(50) DEFAULT NULL COMMENT '组织编码',
+  `parent_id` varchar(100) DEFAULT NULL COMMENT '上级组织ID',
+  `level` int(11) DEFAULT '1' COMMENT '层级',
+  `sort` int(11) DEFAULT '0' COMMENT '排序',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_org_id` (`org_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='组织表';
+
+-- ============================================
+-- 审计与日志
+-- ============================================
+
+-- 29. 操作日志表
+DROP TABLE IF EXISTS `audit_log`;
+CREATE TABLE `audit_log` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+  `module` varchar(50) DEFAULT NULL COMMENT '模块',
+  `operation` varchar(50) DEFAULT NULL COMMENT '操作',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `request_method` varchar(10) DEFAULT NULL COMMENT '请求方法',
+  `request_url` varchar(500) DEFAULT NULL COMMENT '请求URL',
+  `request_params` text COMMENT '请求参数',
+  `response_data` text COMMENT '响应数据',
+  `user_id` bigint(20) DEFAULT NULL COMMENT '用户ID',
+  `username` varchar(50) DEFAULT NULL COMMENT '用户名',
+  `ip` varchar(50) DEFAULT NULL COMMENT 'IP地址',
+  `execute_time` int(11) DEFAULT NULL COMMENT '执行时间（毫秒）',
+  `status` tinyint(1) DEFAULT '1' COMMENT '状态：0-失败，1-成功',
+  `error_message` varchar(500) DEFAULT NULL COMMENT '错误信息',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  PRIMARY KEY (`id`),
+  KEY `idx_user` (`user_id`),
+  KEY `idx_module` (`module`),
+  KEY `idx_create_time` (`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志表';
+
+-- ============================================
+-- 扩展功能
+-- ============================================
+
+-- 30. 协议插件表
+DROP TABLE IF EXISTS `protocol_plugin`;
+CREATE TABLE `protocol_plugin` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '插件ID',
+  `name` varchar(100) NOT NULL COMMENT '插件名称',
+  `code` varchar(50) NOT NULL COMMENT '插件编码',
+  `protocol` varchar(50) NOT NULL COMMENT '支持的协议',
+  `version` varchar(20) DEFAULT NULL COMMENT '版本',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `jar_path` varchar(200) DEFAULT NULL COMMENT 'JAR文件路径',
+  `enabled` tinyint(1) DEFAULT '1' COMMENT '是否启用',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='协议插件表';
+
+-- 31. API配置表
+DROP TABLE IF EXISTS `api_config`;
+CREATE TABLE `api_config` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '配置ID',
+  `api_name` varchar(100) NOT NULL COMMENT 'API名称',
+  `api_path` varchar(200) NOT NULL COMMENT 'API路径',
+  `version` varchar(20) DEFAULT 'v1' COMMENT '版本',
+  `description` varchar(500) DEFAULT NULL COMMENT '描述',
+  `enabled` tinyint(1) DEFAULT '1' COMMENT '是否启用',
+  `rate_limit` int(11) DEFAULT '100' COMMENT '限流（次/分钟）',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_api` (`api_path`, `version`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='API配置表';
+
+-- 32. 用户数据中心权限表
+DROP TABLE IF EXISTS `user_data_center_permission`;
+CREATE TABLE `user_data_center_permission` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT '权限ID',
+  `user_id` bigint(20) NOT NULL COMMENT '用户ID',
+  `data_center_id` bigint(20) NOT NULL COMMENT '数据中心ID',
+  `permission_type` varchar(20) NOT NULL COMMENT '权限类型：READ,WRITE,ADMIN',
+  `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` tinyint(1) DEFAULT '0' COMMENT '删除标记',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_user_dc` (`user_id`, `data_center_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户数据中心权限表';
+
+-- ============================================
+-- 初始化数据
+-- ============================================
+
+-- 插入默认管理员账户（密码：Admin@123，BCrypt加密）
+INSERT INTO `user` (`username`, `password`, `real_name`, `email`, `status`, `create_by`) 
+VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', '系统管理员', 'admin@example.com', 1, 'SYSTEM');
 
 -- 插入默认角色
-INSERT INTO `roles` (`id`, `code`, `name`, `description`, `is_system`, `status`) VALUES
-('role-admin', 'ADMIN', '超级管理员', '系统超级管理员，拥有所有权限', 1, 'ACTIVE'),
-('role-manager', 'MANAGER', '管理员', '管理员，拥有大部分管理权限', 1, 'ACTIVE'),
-('role-inspector', 'INSPECTOR', '巡检员', '巡检员，负责机房巡检工作', 1, 'ACTIVE'),
-('role-operator', 'OPERATOR', '值班员', '值班员，负责日常值班工作', 1, 'ACTIVE');
+INSERT INTO `role` (`name`, `code`, `description`, `data_scope`) VALUES
+('超级管理员', 'ADMIN', '拥有系统所有权限', 1),
+('巡检员', 'INSPECTOR', '巡检设备，提交巡检记录', 4),
+('值班员', 'DUTY', '值班管理，交接班记录', 3),
+('查看员', 'VIEWER', '查看数据，无编辑权限', 2);
 
--- 为管理员分配角色
-INSERT INTO `user_roles` (`id`, `user_id`, `role_id`) VALUES
-('user-role-admin', 'admin-id', 'role-admin');
+-- 给管理员分配角色
+INSERT INTO `user_role` (`user_id`, `role_id`) VALUES (1, 1);
 
--- 插入示例部门
-INSERT INTO `departments` (`id`, `code`, `name`, `parent_id`, `level`, `path`, `status`) VALUES
-('dept-root', 'ROOT', '总部', NULL, 0, '/ROOT', 'ACTIVE'),
-('dept-ops', 'OPS', '运维部', 'dept-root', 1, '/ROOT/dept-ops', 'ACTIVE'),
-('dept-net', 'NET', '网络部', 'dept-root', 1, '/ROOT/dept-net', 'ACTIVE');
+-- 插入默认权限（部分核心权限）
+INSERT INTO `permission` (`name`, `code`, `type`, `parent_id`, `path`, `icon`, `sort`) VALUES
+('系统管理', 'system', 1, 0, '/system', 'Setting', 100),
+('用户管理', 'user', 1, (SELECT id FROM permission WHERE code='system'), '/system/user', 'User', 1),
+('角色管理', 'role', 1, (SELECT id FROM permission WHERE code='system'), '/system/role', 'Shield', 2),
+('巡检管理', 'inspection', 1, 0, '/inspection', 'Clipboard', 200),
+('巡检计划', 'inspection-plan', 1, (SELECT id FROM permission WHERE code='inspection'), '/inspection/plan', 'Calendar', 1),
+('巡检记录', 'inspection-record', 1, (SELECT id FROM permission WHERE code='inspection'), '/inspection/list', 'List', 2),
+('设备管理', 'device', 1, 0, '/device', 'Server', 300),
+('设备列表', 'device-list', 1, (SELECT id FROM permission WHERE code='device'), '/device/list', 'Monitor', 1),
+('机房管理', 'room', 1, 0, '/room', 'Home', 400),
+('机房列表', 'room-list', 1, (SELECT id FROM permission WHERE code='room'), '/room/list', 'Building', 1);
 
--- 插入示例机房
-INSERT INTO `rooms` (`id`, `code`, `name`, `type`, `location`, `floor`, `area`, `capacity`, `status`) VALUES
-('room-001', 'ROOM-A-101', '机房A-101', 'IDC', '中心机房', '3楼', 500.0, 200, 'NORMAL'),
-('room-002', 'ROOM-B-203', '机房B-203', 'IDC', '中心机房', '2楼', 300.0, 100, 'NORMAL'),
-('room-003', 'ROOM-C-305', '机房C-305', 'EDGE', '边缘机房', '5楼', 200.0, 50, 'NORMAL');
+-- 插入默认部门
+INSERT INTO `department` (`name`, `code`, `parent_id`, `level`, `sort`) VALUES
+('总公司', 'HEADQUARTERS', 0, 1, 1),
+('信息技术部', 'IT_DEPT', (SELECT id FROM department WHERE code='HEADQUARTERS'), 2, 1),
+('运维部', 'OPS_DEPT', (SELECT id FROM department WHERE code='IT_DEPT'), 3, 1),
+('监控部', 'MONITOR_DEPT', (SELECT id FROM department WHERE code='IT_DEPT'), 3, 2);
 
--- 插入示例值班人员
-INSERT INTO `staffs` (`id`, `employee_id`, `name`, `department`, `position`, `phone`, `email`, `status`, `joined_date`) VALUES
-('staff-001', 'STF-001', '张三', '运维一部', '值班工程师', '13800138001', 'zhangsan@example.com', 'ACTIVE', '2024-01-15'),
-('staff-002', 'STF-002', '李四', '运维一部', '值班工程师', '13800138002', 'lisi@example.com', 'ACTIVE', '2024-02-20'),
-('staff-003', 'STF-003', '王五', '运维二部', '值班工程师', '13800138003', 'wangwu@example.com', 'ACTIVE', '2024-03-10');
+-- 插入默认数据中心
+INSERT INTO `data_center` (`name`, `code`, `location`, `contact_person`, `contact_phone`) VALUES
+('主数据中心', 'DC_MAIN', '北京市朝阳区', '张经理', '13800138000'),
+('备数据中心', 'DC_BACKUP', '上海市浦东新区', '李经理', '13900139000');
 
--- 插入示例排班（白班和夜班）
-INSERT INTO `shift_schedules` (`id`, `schedule_date`, `shift`, `staff_id`, `staff_name`, `status`) VALUES
-('schedule-001', CURDATE(), 'DAY', 'staff-001', '张三', 'SCHEDULED'),
-('schedule-002', CURDATE(), 'NIGHT', 'staff-002', '李四', 'SCHEDULED');
+-- 插入默认机房
+INSERT INTO `room` (`name`, `code`, `data_center_id`, `floor`, `location`, `area`) VALUES
+('A区机房', 'ROOM_A', (SELECT id FROM data_center WHERE code='DC_MAIN'), 3, '东侧', 500.00),
+('B区机房', 'ROOM_B', (SELECT id FROM data_center WHERE code='DC_MAIN'), 3, '西侧', 450.00);
 
--- ============================================
--- 接口配置模块
--- ============================================
+-- 插入默认巡检模板
+INSERT INTO `inspection_template` (`name`, `code`, `type`, `description`) VALUES
+('日常巡检模板', 'DAILY', 'REGULAR', '日常设备巡检标准模板'),
+('专项巡检模板', 'SPECIAL', 'SPECIAL', '专项检查模板');
 
--- 接口配置表
-CREATE TABLE IF NOT EXISTS `api_config` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `config_type` varchar(50) NOT NULL COMMENT '配置类型：DINGTALK-钉钉, SMS-短信, EMAIL-邮件, HIKVISION-海康门禁, DAHUA-大华门禁, SNMP-SNMP监控, MODBUS-Modbus监控, BMS-BMS接口, SENSOR-传感器网络, FIRE-消防主机, OTHER-其他',
-  `config_name` varchar(100) NOT NULL COMMENT '配置名称',
-  `config_key` varchar(100) NOT NULL COMMENT '配置键',
-  `config_value` text DEFAULT NULL COMMENT '配置值（敏感信息需加密存储）',
-  `description` varchar(500) DEFAULT NULL COMMENT '配置描述',
-  `is_sensitive` tinyint(1) NOT NULL DEFAULT '0' COMMENT '是否敏感配置（0-否 1-是）',
-  `config_group` varchar(50) DEFAULT NULL COMMENT '配置分组',
-  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '是否启用（0-禁用 1-启用）',
-  `sort_order` int NOT NULL DEFAULT '0' COMMENT '排序序号',
-  `created_by` bigint DEFAULT NULL COMMENT '创建人ID',
-  `created_by_name` varchar(50) DEFAULT NULL COMMENT '创建人姓名',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_by` bigint DEFAULT NULL COMMENT '更新人ID',
-  `updated_by_name` varchar(50) DEFAULT NULL COMMENT '更新人姓名',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `extra_config` json DEFAULT NULL COMMENT '扩展JSON字段（存储额外的配置信息）',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_config_type_key` (`config_type`,`config_key`),
-  KEY `idx_config_type` (`config_type`),
-  KEY `idx_config_group` (`config_group`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='接口配置表';
+-- 插入默认巡检模板项
+INSERT INTO `inspection_template_item` (`template_id`, `item_name`, `item_type`, `required`, `sort`) VALUES
+((SELECT id FROM inspection_template WHERE code='DAILY'), '设备外观检查', 'STATUS', 1, 1),
+((SELECT id FROM inspection_template WHERE code='DAILY'), '温度检查', 'NUMERIC', 1, 2),
+((SELECT id FROM inspection_template WHERE code='DAILY'), '湿度检查', 'NUMERIC', 1, 3),
+((SELECT id FROM inspection_template WHERE code='DAILY'), '指示灯状态', 'STATUS', 1, 4),
+((SELECT id FROM inspection_template WHERE code='DAILY'), '噪音检查', 'NUMERIC', 0, 5),
+((SELECT id FROM inspection_template WHERE code='DAILY'), '拍照记录', 'IMAGE', 1, 6);
 
--- 插入示例接口配置
--- 钉钉API配置
-INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
-('DINGTALK', '钉钉AppKey', 'dingtalk.app.key', '', '钉钉开放平台AppKey', 1, '钉钉配置', 1, 1),
-('DINGTALK', '钉钉AppSecret', 'dingtalk.app.secret', '', '钉钉开放平台AppSecret', 1, '钉钉配置', 1, 2),
-('DINGTALK', '钉钉AgentId', 'dingtalk.agent.id', '', '钉钉微应用AgentId', 0, '钉钉配置', 1, 3),
-('DINGTALK', '钉钉API地址', 'dingtalk.api.url', 'https://oapi.dingtalk.com', '钉钉API服务地址', 0, '钉钉配置', 1, 4);
+-- 插入默认采集节点
+INSERT INTO `collector_node` (`node_id`, `node_name`, `ip`, `port`, `status`, `device_count`) VALUES
+('NODE_001', '采集节点1', '192.168.1.100', 8081, 'ONLINE', 50),
+('NODE_002', '采集节点2', '192.168.1.101', 8081, 'ONLINE', 50);
 
--- 短信API配置
-INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
-('SMS', '阿里云AccessKeyId', 'sms.access.key.id', '', '阿里云短信服务AccessKeyId', 1, '短信配置', 1, 1),
-('SMS', '阿里云AccessKeySecret', 'sms.access.key.secret', '', '阿里云短信服务AccessKeySecret', 1, '短信配置', 1, 2),
-('SMS', '短信签名', 'sms.sign.name', '', '短信签名名称', 0, '短信配置', 1, 3),
-('SMS', '值班提醒模板ID', 'sms.template.shift.remind', '', '值班提醒短信模板ID', 0, '短信配置', 1, 4),
-('SMS', '交接提醒模板ID', 'sms.template.handover.remind', '', '交接提醒短信模板ID', 0, '短信配置', 1, 5);
-
--- 门禁API配置（海康）
-INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
-('HIKVISION', '海康API地址', 'hikvision.api.url', 'http://localhost:8080/artemis', '海康门禁API地址', 0, '海康门禁', 1, 1),
-('HIKVISION', '海康AppKey', 'hikvision.app.key', '', '海康开放平台AppKey', 1, '海康门禁', 1, 2),
-('HIKVISION', '海康AppSecret', 'hikvision.app.secret', '', '海康开放平台AppSecret', 1, '海康门禁', 1, 3);
-
--- 门禁API配置（大华）
-INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
-('DAHUA', '大华API地址', 'dahua.api.url', 'http://localhost:8080', '大华门禁API地址', 0, '大华门禁', 1, 1),
-('DAHUA', '大华用户名', 'dahua.username', 'admin', '大华门禁系统用户名', 1, '大华门禁', 1, 2),
-('DAHUA', '大华密码', 'dahua.password', '', '大华门禁系统密码', 1, '大华门禁', 1, 3);
-
--- 监控协议配置（SNMP）
-INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
-('SNMP', 'SNMP版本', 'snmp.version', 'v2c', 'SNMP协议版本', 0, 'SNMP配置', 1, 1),
-('SNMP', 'SNMP Community', 'snmp.community', 'public', 'SNMP Community字符串', 1, 'SNMP配置', 1, 2),
-('SNMP', 'SNMP超时时间', 'snmp.timeout', '5000', 'SNMP超时时间（毫秒）', 0, 'SNMP配置', 1, 3),
-('SNMP', 'SNMP重试次数', 'snmp.retry', '3', 'SNMP重试次数', 0, 'SNMP配置', 1, 4);
-
--- 监控协议配置（Modbus）
-INSERT INTO `api_config` (`config_type`, `config_name`, `config_key`, `config_value`, `description`, `is_sensitive`, `config_group`, `status`, `sort_order`) VALUES
-('MODBUS', 'Modbus超时时间', 'modbus.timeout', '3000', 'Modbus超时时间（毫秒）', 0, 'Modbus配置', 1, 1),
-('MODBUS', 'Modbus重试次数', 'modbus.retry', '2', 'Modbus重试次数', 0, 'Modbus配置', 1, 2);
+-- 恢复外键检查
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================
--- 设备巡检模块
+-- 初始化完成
 -- ============================================
-
--- 更新设备表结构
-ALTER TABLE `devices`
-ADD COLUMN `sub_type` varchar(50) DEFAULT NULL COMMENT '设备子类型' AFTER `type`,
-ADD COLUMN `room_name` varchar(100) DEFAULT NULL COMMENT '机房名称' AFTER `room_id`,
-ADD COLUMN `snmp_version` varchar(10) DEFAULT 'v2c' COMMENT 'SNMP版本' AFTER `protocol`,
-ADD COLUMN `snmp_community` varchar(100) DEFAULT 'public' COMMENT 'SNMP Community字符串' AFTER `snmp_version`,
-ADD COLUMN `snmp_port` int DEFAULT 161 COMMENT 'SNMP端口号' AFTER `snmp_community`,
-ADD COLUMN `is_key_device` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否关键设备（需要拍照巡检）' AFTER `access_control_device_id`,
-ADD COLUMN `inspection_cycle` varchar(20) DEFAULT 'DAILY' COMMENT '巡检周期' AFTER `is_key_device`,
-ADD COLUMN `custom_inspection_interval` int DEFAULT NULL COMMENT '自定义巡检间隔（分钟）' AFTER `inspection_cycle`,
-ADD COLUMN `cpu_threshold` double DEFAULT 80.0 COMMENT 'CPU使用率告警阈值（%）' AFTER `custom_inspection_interval`,
-ADD COLUMN `memory_threshold` double DEFAULT 85.0 COMMENT '内存使用率告警阈值（%）' AFTER `cpu_threshold`,
-ADD COLUMN `disk_threshold` double DEFAULT 90.0 COMMENT '磁盘使用率告警阈值（%）' AFTER `memory_threshold`,
-ADD COLUMN `traffic_threshold` double DEFAULT 200.0 COMMENT '流量异常波动告警阈值（%）' AFTER `disk_threshold`,
-ADD COLUMN `port_down_alert_enabled` tinyint(1) NOT NULL DEFAULT 1 COMMENT '端口异常告警' AFTER `traffic_threshold`,
-ADD COLUMN `device_labels` text DEFAULT NULL COMMENT '设备标签信息（JSON格式，用于OCR识别）' AFTER `port_down_alert_enabled`,
-ADD COLUMN `latest_photo_url` varchar(500) DEFAULT NULL COMMENT '最新巡检照片URL' AFTER `device_labels`,
-ADD COLUMN `last_inspection_time` datetime DEFAULT NULL COMMENT '上次巡检时间' AFTER `latest_photo_url`,
-ADD COLUMN `next_inspection_time` datetime DEFAULT NULL COMMENT '下次巡检时间' AFTER `last_inspection_time`,
-ADD COLUMN `current_cpu_usage` double DEFAULT NULL COMMENT '当前CPU使用率（%）' AFTER `status`,
-ADD COLUMN `current_memory_usage` double DEFAULT NULL COMMENT '当前内存使用率（%）' AFTER `current_cpu_usage`,
-ADD COLUMN `current_disk_usage` double DEFAULT NULL COMMENT '当前磁盘使用率（%）' AFTER `current_memory_usage`,
-ADD COLUMN `last_status_update_time` datetime DEFAULT NULL COMMENT '最近状态更新时间' AFTER `current_disk_usage`,
-ADD COLUMN `manager_name` varchar(50) DEFAULT NULL COMMENT '负责人姓名' AFTER `manager_id`,
-ADD COLUMN `created_by` bigint DEFAULT NULL COMMENT '创建人ID' AFTER `description`,
-ADD COLUMN `created_by_name` varchar(50) DEFAULT NULL COMMENT '创建人姓名' AFTER `created_by`,
-ADD COLUMN `updated_by` bigint DEFAULT NULL COMMENT '更新人ID' AFTER `created_at`,
-ADD COLUMN `updated_by_name` varchar(50) DEFAULT NULL COMMENT '更新人姓名' AFTER `updated_by`;
-
--- 设备巡检记录表
-CREATE TABLE IF NOT EXISTS `device_inspection_record` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `code` varchar(50) NOT NULL COMMENT '巡检编号',
-  `device_id` varchar(36) NOT NULL COMMENT '设备ID',
-  `device_code` varchar(50) DEFAULT NULL COMMENT '设备编号',
-  `device_name` varchar(100) DEFAULT NULL COMMENT '设备名称',
-  `device_type` varchar(50) DEFAULT NULL COMMENT '设备类型',
-  `room_id` varchar(36) DEFAULT NULL COMMENT '机房ID',
-  `room_name` varchar(100) DEFAULT NULL COMMENT '机房名称',
-  `inspection_type` varchar(20) NOT NULL DEFAULT 'AUTO' COMMENT '巡检类型（AUTO-自动巡检，MANUAL-手动巡检）',
-  `inspection_method` varchar(20) NOT NULL COMMENT '巡检方式（SNMP-SNMP采集，SCRIPT-脚本执行，PHOTO-拍照巡检，MANUAL-手动录入）',
-  `start_time` datetime NOT NULL COMMENT '巡检开始时间',
-  `end_time` datetime DEFAULT NULL COMMENT '巡检结束时间',
-  `inspector_id` varchar(36) DEFAULT NULL COMMENT '巡检人ID',
-  `inspector_name` varchar(50) DEFAULT NULL COMMENT '巡检人姓名',
-  `result` varchar(20) DEFAULT NULL COMMENT '巡检结果（NORMAL-正常，WARNING-警告，ERROR-错误）',
-  `cpu_usage` double DEFAULT NULL COMMENT 'CPU使用率（%）',
-  `memory_usage` double DEFAULT NULL COMMENT '内存使用率（%）',
-  `disk_usage` double DEFAULT NULL COMMENT '磁盘使用率（%）',
-  `inspection_data` text DEFAULT NULL COMMENT '巡检数据（JSON格式）',
-  `issues` text DEFAULT NULL COMMENT '异常信息',
-  `suggestions` text DEFAULT NULL COMMENT '处理建议',
-  `photo_urls` text DEFAULT NULL COMMENT '照片URL列表（逗号分隔）',
-  `ocr_recognized` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已OCR识别',
-  `ocr_result` text DEFAULT NULL COMMENT 'OCR识别结果（JSON格式）',
-  `has_watermark` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否包含水印',
-  `watermark_info` text DEFAULT NULL COMMENT '水印信息（JSON格式）',
-  `script_result` text DEFAULT NULL COMMENT '脚本执行结果',
-  `is_alerted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否告警',
-  `alert_ids` varchar(500) DEFAULT NULL COMMENT '告警ID列表（逗号分隔）',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `created_by` bigint DEFAULT NULL COMMENT '创建人ID',
-  `created_by_name` varchar(50) DEFAULT NULL COMMENT '创建人姓名',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_by` bigint DEFAULT NULL COMMENT '更新人ID',
-  `updated_by_name` varchar(50) DEFAULT NULL COMMENT '更新人姓名',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_code` (`code`),
-  KEY `idx_device_id` (`device_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_inspection_type` (`inspection_type`),
-  KEY `idx_result` (`result`),
-  KEY `idx_start_time` (`start_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='设备巡检记录表';
-
--- 设备监控指标表
-CREATE TABLE IF NOT EXISTS `device_metric` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `device_id` varchar(36) NOT NULL COMMENT '设备ID',
-  `device_code` varchar(50) DEFAULT NULL COMMENT '设备编号',
-  `device_name` varchar(100) DEFAULT NULL COMMENT '设备名称',
-  `metric_type` varchar(50) NOT NULL COMMENT '指标类型',
-  `metric_name` varchar(100) DEFAULT NULL COMMENT '指标名称',
-  `metric_value` double DEFAULT NULL COMMENT '指标值',
-  `unit` varchar(20) DEFAULT NULL COMMENT '指标单位',
-  `status` varchar(20) DEFAULT 'NORMAL' COMMENT '指标状态（NORMAL-正常，WARNING-警告，CRITICAL-严重）',
-  `exceeded_threshold` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否超出阈值',
-  `port_name` varchar(100) DEFAULT NULL COMMENT '端口名称',
-  `port_index` int DEFAULT NULL COMMENT '端口索引',
-  `port_status` varchar(20) DEFAULT NULL COMMENT '端口状态（UP, DOWN, TESTING, UNKNOWN）',
-  `disk_name` varchar(100) DEFAULT NULL COMMENT '磁盘名称',
-  `disk_path` varchar(200) DEFAULT NULL COMMENT '磁盘路径',
-  `disk_total` double DEFAULT NULL COMMENT '磁盘总量（GB）',
-  `disk_used` double DEFAULT NULL COMMENT '磁盘已用量（GB）',
-  `disk_free` double DEFAULT NULL COMMENT '磁盘可用量（GB）',
-  `threshold_upper` double DEFAULT NULL COMMENT '阈值上限',
-  `threshold_lower` double DEFAULT NULL COMMENT '阈值下限',
-  `custom_key` varchar(200) DEFAULT NULL COMMENT '自定义指标键',
-  `custom_value` text DEFAULT NULL COMMENT '自定义指标值（JSON格式）',
-  `collection_method` varchar(20) DEFAULT NULL COMMENT '采集方式',
-  `collection_time` datetime NOT NULL COMMENT '采集时间',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_device_id` (`device_id`),
-  KEY `idx_metric_type` (`metric_type`),
-  KEY `idx_collection_time` (`collection_time`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='设备监控指标表';
-
--- 告警规则表
-CREATE TABLE IF NOT EXISTS `alert_rule` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `rule_name` varchar(100) NOT NULL COMMENT '规则名称',
-  `rule_code` varchar(100) NOT NULL COMMENT '规则编码',
-  `device_id` varchar(36) DEFAULT NULL COMMENT '设备ID',
-  `device_type` varchar(50) DEFAULT NULL COMMENT '设备类型',
-  `device_sub_type` varchar(50) DEFAULT NULL COMMENT '设备子类型',
-  `room_id` varchar(36) DEFAULT NULL COMMENT '机房ID',
-  `alert_type` varchar(50) NOT NULL COMMENT '告警类型',
-  `alert_level` varchar(20) NOT NULL COMMENT '告警级别（INFO-信息，WARNING-警告，CRITICAL-严重，EMERGENCY-紧急）',
-  `condition` varchar(20) NOT NULL COMMENT '告警条件（GT-大于，LT-小于，EQ-等于等）',
-  `threshold_upper` double DEFAULT NULL COMMENT '阈值上限',
-  `threshold_lower` double DEFAULT NULL COMMENT '阈值下限',
-  `duration` int DEFAULT NULL COMMENT '持续时间（秒）',
-  `message_template` varchar(500) DEFAULT NULL COMMENT '告警消息模板',
-  `status` tinyint(1) NOT NULL DEFAULT 1 COMMENT '是否启用',
-  `notify_method` varchar(20) DEFAULT 'ALL' COMMENT '通知方式（EMAIL-邮件，SMS-短信，DINGTALK-钉钉，ALL-全部）',
-  `notify_user_ids` varchar(500) DEFAULT NULL COMMENT '通知人员ID列表（逗号分隔）',
-  `is_silenced` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否静默',
-  `silence_start_time` datetime DEFAULT NULL COMMENT '静默开始时间',
-  `silence_end_time` datetime DEFAULT NULL COMMENT '静默结束时间',
-  `recovery_notify` tinyint(1) NOT NULL DEFAULT 1 COMMENT '告警恢复通知',
-  `priority` int NOT NULL DEFAULT 0 COMMENT '规则优先级',
-  `description` varchar(500) DEFAULT NULL COMMENT '描述',
-  `created_by` bigint DEFAULT NULL COMMENT '创建人ID',
-  `created_by_name` varchar(50) DEFAULT NULL COMMENT '创建人姓名',
-  `created_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_by` bigint DEFAULT NULL COMMENT '更新人ID',
-  `updated_by_name` varchar(50) DEFAULT NULL COMMENT '更新人姓名',
-  `updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_rule_code` (`rule_code`),
-  KEY `idx_device_id` (`device_id`),
-  KEY `idx_device_type` (`device_type`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_alert_type` (`alert_type`),
-  KEY `idx_alert_level` (`alert_level`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='告警规则表';
-
--- 插入示例告警规则
-INSERT INTO `alert_rule` (`rule_name`, `rule_code`, `device_type`, `alert_type`, `alert_level`, `condition`, `threshold_upper`, `duration`, `message_template`, `status`, `notify_method`) VALUES
-('CPU使用率过高告警', 'CPU_HIGH_USAGE', 'SERVER', 'CPU_USAGE', 'WARNING', 'GT', 80.0, 300, '设备{deviceName}的CPU使用率达到{metricValue}%，超过阈值80%', 1, 'ALL'),
-('内存使用率过高告警', 'MEMORY_HIGH_USAGE', 'SERVER', 'MEMORY_USAGE', 'WARNING', 'GT', 85.0, 300, '设备{deviceName}的内存使用率达到{metricValue}%，超过阈值85%', 1, 'ALL'),
-('磁盘使用率过高告警', 'DISK_HIGH_USAGE', 'SERVER', 'DISK_USAGE', 'CRITICAL', 'GT', 90.0, 300, '设备{deviceName}的磁盘{diskName}使用率达到{metricValue}%，超过阈值90%', 1, 'ALL'),
-('端口Down告警', 'PORT_DOWN', 'SWITCH', 'PORT_DOWN', 'CRITICAL', 'EQ', 0.0, 0, '设备{deviceName}的端口{portName}状态为DOWN', 1, 'ALL'),
-('流量异常波动告警', 'TRAFFIC_ABNORMAL', 'SWITCH', 'TRAFFIC_ABNORMAL', 'WARNING', 'GT', 200.0, 60, '设备{deviceName}的流量异常波动，变化率达到{metricValue}%', 1, 'ALL');
-
--- ============================================
--- 巡检核验体系模块
--- ============================================
-
--- 门禁日志表
-CREATE TABLE IF NOT EXISTS `door_access_log` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `system_type` varchar(20) DEFAULT NULL COMMENT '门禁系统类型（hikvision-海康、dahua-大华、custom-自定义）',
-  `device_id` varchar(100) DEFAULT NULL COMMENT '门禁设备ID',
-  `device_name` varchar(100) DEFAULT NULL COMMENT '门禁设备名称',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `staff_id` bigint DEFAULT NULL COMMENT '人员ID',
-  `staff_name` varchar(50) DEFAULT NULL COMMENT '人员姓名',
-  `staff_code` varchar(50) DEFAULT NULL COMMENT '人员工号/卡号',
-  `direction` varchar(10) DEFAULT NULL COMMENT '进出方向（in-进入、out-离开）',
-  `access_time` datetime NOT NULL COMMENT '进出时间',
-  `access_method` varchar(20) DEFAULT NULL COMMENT '访问方式（card-刷卡、face-人脸、fingerprint-指纹、password-密码）',
-  `status` varchar(20) DEFAULT NULL COMMENT '访问状态（success-成功、failed-失败、denied-拒绝）',
-  `reject_reason` varchar(500) DEFAULT NULL COMMENT '拒绝原因',
-  `inspection_task_id` bigint DEFAULT NULL COMMENT '关联巡检任务ID',
-  `verified` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否已核验',
-  `verification_result` varchar(20) DEFAULT NULL COMMENT '核验结果（match-匹配、mismatch-不匹配、pending-待核验）',
-  `photo_url` varchar(500) DEFAULT NULL COMMENT '门禁照片URL',
-  `extra_data` text DEFAULT NULL COMMENT '扩展字段（JSON格式，存储门禁系统返回的原始数据）',
-  `data_source` varchar(20) DEFAULT 'sync' COMMENT '数据来源（sync-同步对接、manual-手动录入）',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除标志',
-  PRIMARY KEY (`id`),
-  KEY `idx_system_type` (`system_type`),
-  KEY `idx_device_id` (`device_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_staff_id` (`staff_id`),
-  KEY `idx_access_time` (`access_time`),
-  KEY `idx_inspection_task_id` (`inspection_task_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='门禁日志表';
-
--- 照片核验表
-CREATE TABLE IF NOT EXISTS `photo_verification` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `inspection_task_id` bigint DEFAULT NULL COMMENT '关联巡检任务ID',
-  `device_id` bigint DEFAULT NULL COMMENT '关联设备ID',
-  `device_name` varchar(100) DEFAULT NULL COMMENT '设备名称',
-  `device_type` varchar(50) DEFAULT NULL COMMENT '设备类型',
-  `photo_path` varchar(500) DEFAULT NULL COMMENT '照片OSS存储路径',
-  `photo_url` varchar(500) DEFAULT NULL COMMENT '照片URL',
-  `uploader_id` bigint DEFAULT NULL COMMENT '上传人员ID',
-  `uploader_name` varchar(50) DEFAULT NULL COMMENT '上传人员姓名',
-  `photo_time` datetime DEFAULT NULL COMMENT '拍照时间',
-  `photo_location` varchar(200) DEFAULT NULL COMMENT '拍摄位置',
-  `resolution` varchar(20) DEFAULT NULL COMMENT '照片分辨率（如：1920x1080）',
-  `file_size` bigint DEFAULT NULL COMMENT '照片大小（字节）',
-  `clarity_score` int DEFAULT NULL COMMENT '清晰度评分（0-100分）',
-  `brightness_score` int DEFAULT NULL COMMENT '亮度评分（0-100分）',
-  `blur_status` varchar(20) DEFAULT NULL COMMENT '模糊度检测（normal-正常、blurry-模糊、very_blurry-严重模糊）',
-  `ocr_result` text DEFAULT NULL COMMENT 'OCR识别结果（JSON格式）',
-  `ocr_confidence` double DEFAULT NULL COMMENT 'OCR识别置信度（0-1）',
-  `label_recognizable` tinyint(1) NOT NULL DEFAULT 0 COMMENT '设备标签是否可识别',
-  `time_consistent` tinyint(1) DEFAULT NULL COMMENT '时间一致性核验',
-  `time_deviation` int DEFAULT NULL COMMENT '时间偏差（秒）',
-  `location_consistent` tinyint(1) DEFAULT NULL COMMENT '位置一致性核验',
-  `watermark` text DEFAULT NULL COMMENT '照片水印内容（JSON格式）',
-  `verification_status` varchar(20) DEFAULT 'pending' COMMENT '核验状态（pending-待核验、passed-通过、failed-未通过、manual-人工复核）',
-  `verification_summary` varchar(500) DEFAULT NULL COMMENT '核验结果摘要',
-  `verifier_id` bigint DEFAULT NULL COMMENT '核验人员ID',
-  `verification_time` datetime DEFAULT NULL COMMENT '核验时间',
-  `abnormal_type` varchar(50) DEFAULT NULL COMMENT '异常标记（multiple-重复照片、dark-光线过暗、blur-模糊、no_label-无标签）',
-  `extra_data` text DEFAULT NULL COMMENT '扩展字段（JSON格式）',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除标志',
-  PRIMARY KEY (`id`),
-  KEY `idx_inspection_task_id` (`inspection_task_id`),
-  KEY `idx_device_id` (`device_id`),
-  KEY `idx_uploader_id` (`uploader_id`),
-  KEY `idx_verification_status` (`verification_status`),
-  KEY `idx_photo_time` (`photo_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='照片核验表';
-
--- 巡检核验表
-CREATE TABLE IF NOT EXISTS `inspection_verification` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `inspection_task_id` bigint DEFAULT NULL COMMENT '巡检任务ID',
-  `task_no` varchar(50) DEFAULT NULL COMMENT '任务编号',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `room_name` varchar(100) DEFAULT NULL COMMENT '机房名称',
-  `inspector_id` bigint DEFAULT NULL COMMENT '巡检人员ID',
-  `inspector_name` varchar(50) DEFAULT NULL COMMENT '巡检人员姓名',
-  `planned_start_time` datetime DEFAULT NULL COMMENT '计划开始时间',
-  `planned_end_time` datetime DEFAULT NULL COMMENT '计划结束时间',
-  `actual_start_time` datetime DEFAULT NULL COMMENT '实际开始时间',
-  `actual_end_time` datetime DEFAULT NULL COMMENT '实际结束时间',
-  `planned_duration` int DEFAULT NULL COMMENT '计划时长（分钟）',
-  `actual_duration` int DEFAULT NULL COMMENT '实际时长（分钟）',
-  `stay_duration` int DEFAULT NULL COMMENT '停留时长（分钟）',
-  `planned_device_count` int DEFAULT NULL COMMENT '计划巡检设备数',
-  `actual_device_count` int DEFAULT NULL COMMENT '实际巡检设备数',
-  `planned_route` text DEFAULT NULL COMMENT '计划巡检路线（JSON格式）',
-  `actual_route` text DEFAULT NULL COMMENT '实际巡检路线（JSON格式）',
-  `route_consistent` tinyint(1) DEFAULT NULL COMMENT '路线一致性',
-  `access_verified` tinyint(1) DEFAULT 0 COMMENT '进出核验',
-  `enter_log_id` bigint DEFAULT NULL COMMENT '进门禁记录ID',
-  `exit_log_id` bigint DEFAULT NULL COMMENT '离门禁记录ID',
-  `on_time_entry` tinyint(1) DEFAULT NULL COMMENT '是否按时进入',
-  `on_time_completion` tinyint(1) DEFAULT NULL COMMENT '是否按时完成',
-  `entry_delay` int DEFAULT NULL COMMENT '进入延迟时间（分钟）',
-  `completion_delay` int DEFAULT NULL COMMENT '完成延迟时间（分钟）',
-  `photo_passed_count` int DEFAULT 0 COMMENT '照片核验通过数',
-  `photo_failed_count` int DEFAULT 0 COMMENT '照片核验失败数',
-  `photo_pass_rate` decimal(5,2) DEFAULT NULL COMMENT '照片核验率（0-100）',
-  `abnormal_behaviors` text DEFAULT NULL COMMENT '异常行为识别（JSON格式）',
-  `quality_score` int DEFAULT NULL COMMENT '巡检质量评分（0-100分）',
-  `grade_level` varchar(20) DEFAULT NULL COMMENT '评分等级（excellent-优秀、good-良好、average-合格、poor-较差、fail-不合格）',
-  `verification_status` varchar(20) DEFAULT 'pending' COMMENT '核验状态（pending-待核验、processing-核验中、completed-已完成）',
-  `verification_report` text DEFAULT NULL COMMENT '核验报告（Markdown格式）',
-  `suggestions` text DEFAULT NULL COMMENT '核验建议（JSON格式）',
-  `reviewer_id` bigint DEFAULT NULL COMMENT '审核人员ID',
-  `review_comment` text DEFAULT NULL COMMENT '审核意见',
-  `extra_data` text DEFAULT NULL COMMENT '扩展字段（JSON格式）',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除标志',
-  PRIMARY KEY (`id`),
-  KEY `idx_inspection_task_id` (`inspection_task_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_inspector_id` (`inspector_id`),
-  KEY `idx_verification_status` (`verification_status`),
-  KEY `idx_quality_score` (`quality_score`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='巡检核验表';
-
--- ============================================
--- 电力系统监控与巡检模块
--- ============================================
-
--- 电力系统设备表
-CREATE TABLE IF NOT EXISTS `power_system` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `device_code` varchar(50) NOT NULL COMMENT '设备编号',
-  `device_name` varchar(100) NOT NULL COMMENT '设备名称',
-  `device_type` varchar(20) NOT NULL COMMENT '设备类型（main_power-市电、ups-不间断电源、pdu-配电单元、generator-发电机）',
-  `brand` varchar(50) DEFAULT NULL COMMENT '设备品牌',
-  `model` varchar(100) DEFAULT NULL COMMENT '设备型号',
-  `serial_number` varchar(100) DEFAULT NULL COMMENT '序列号',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `room_name` varchar(100) DEFAULT NULL COMMENT '机房名称',
-  `location` varchar(200) DEFAULT NULL COMMENT '位置描述',
-  `rated_capacity` decimal(10,2) DEFAULT NULL COMMENT '额定容量（kVA或kW）',
-  `protocol` varchar(20) DEFAULT NULL COMMENT '监控协议（snmp、modbus、bms、custom）',
-  `monitor_address` varchar(100) DEFAULT NULL COMMENT '监控地址（IP地址或串口地址）',
-  `monitor_port` int DEFAULT NULL COMMENT '监控端口',
-  `auth_credential` varchar(200) DEFAULT NULL COMMENT 'SNMP Community或认证凭证',
-  `oid_config` text DEFAULT NULL COMMENT 'OID配置（JSON格式）',
-  `modbus_config` text DEFAULT NULL COMMENT 'Modbus寄存器配置（JSON格式）',
-  `collect_interval` int DEFAULT 300 COMMENT '采集间隔（秒）',
-  `last_collect_time` datetime DEFAULT NULL COMMENT '上次采集时间',
-  `status` varchar(20) DEFAULT 'unknown' COMMENT '设备状态（online-在线、offline-离线、unknown-未知）',
-  `last_alert_time` datetime DEFAULT NULL COMMENT '最后告警时间',
-  `related_devices` text DEFAULT NULL COMMENT '关联设备列表（JSON格式）',
-  `remark` text DEFAULT NULL COMMENT '备注说明',
-  `extra_data` text DEFAULT NULL COMMENT '扩展字段（JSON格式）',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除标志',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_device_code` (`device_code`),
-  KEY `idx_device_type` (`device_type`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_protocol` (`protocol`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='电力系统设备表';
-
--- 电力指标表
-CREATE TABLE IF NOT EXISTS `power_metric` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `power_system_id` bigint DEFAULT NULL COMMENT '电力设备ID',
-  `device_code` varchar(50) DEFAULT NULL COMMENT '设备编号',
-  `device_type` varchar(20) DEFAULT NULL COMMENT '设备类型',
-  `collect_time` datetime NOT NULL COMMENT '采集时间',
-  `input_voltage_a` decimal(10,2) DEFAULT NULL COMMENT '输入电压A相（V）',
-  `input_voltage_b` decimal(10,2) DEFAULT NULL COMMENT '输入电压B相（V）',
-  `input_voltage_c` decimal(10,2) DEFAULT NULL COMMENT '输入电压C相（V）',
-  `input_current_a` decimal(10,2) DEFAULT NULL COMMENT '输入电流A相（A）',
-  `input_current_b` decimal(10,2) DEFAULT NULL COMMENT '输入电流B相（A）',
-  `input_current_c` decimal(10,2) DEFAULT NULL COMMENT '输入电流C相（A）',
-  `input_frequency` decimal(6,2) DEFAULT NULL COMMENT '输入频率（Hz）',
-  `active_power` decimal(10,2) DEFAULT NULL COMMENT '有功功率（kW）',
-  `reactive_power` decimal(10,2) DEFAULT NULL COMMENT '无功功率（kVar）',
-  `power_factor` decimal(4,3) DEFAULT NULL COMMENT '功率因数',
-  `ups_load_percent` decimal(5,2) DEFAULT NULL COMMENT 'UPS负载百分比（%）',
-  `ups_backup_time` int DEFAULT NULL COMMENT 'UPS后备时间（分钟）',
-  `output_voltage_a` decimal(10,2) DEFAULT NULL COMMENT 'UPS输出电压A相（V）',
-  `output_voltage_b` decimal(10,2) DEFAULT NULL COMMENT 'UPS输出电压B相（V）',
-  `output_voltage_c` decimal(10,2) DEFAULT NULL COMMENT 'UPS输出电压C相（V）',
-  `battery_temperature` decimal(6,2) DEFAULT NULL COMMENT '电池温度（℃）',
-  `battery_capacity` decimal(5,2) DEFAULT NULL COMMENT '电池容量百分比（%）',
-  `battery_status` varchar(20) DEFAULT NULL COMMENT '电池状态（charging-充电、discharging-放电、idle-空闲）',
-  `pdu_total_current` decimal(10,2) DEFAULT NULL COMMENT 'PDU总电流（A）',
-  `pdu_load_status` varchar(20) DEFAULT NULL COMMENT 'PDU负载状态（normal-正常、overload-过载、warning-预警）',
-  `pdu_output_voltage` decimal(10,2) DEFAULT NULL COMMENT 'PDU输出电压（V）',
-  `total_load_percent` decimal(5,2) DEFAULT NULL COMMENT '总负载百分比（%）',
-  `total_active_power` decimal(10,2) DEFAULT NULL COMMENT '总有功功率（kW）',
-  `ambient_temperature` decimal(6,2) DEFAULT NULL COMMENT '环境温度（℃）',
-  `ambient_humidity` decimal(5,2) DEFAULT NULL COMMENT '环境湿度（%）',
-  `data_source` varchar(20) DEFAULT NULL COMMENT '数据来源（snmp、modbus、manual）',
-  `is_alert` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否告警',
-  `alert_info` text DEFAULT NULL COMMENT '告警信息（JSON格式）',
-  `extra_data` text DEFAULT NULL COMMENT '扩展字段（JSON格式）',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_power_system_id` (`power_system_id`),
-  KEY `idx_device_code` (`device_code`),
-  KEY `idx_collect_time` (`collect_time`),
-  KEY `idx_is_alert` (`is_alert`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='电力指标表';
-
--- 电力趋势表
-CREATE TABLE IF NOT EXISTS `power_trend` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `power_system_id` bigint DEFAULT NULL COMMENT '电力设备ID',
-  `device_code` varchar(50) DEFAULT NULL COMMENT '设备编号',
-  `device_name` varchar(100) DEFAULT NULL COMMENT '设备名称',
-  `device_type` varchar(20) DEFAULT NULL COMMENT '设备类型',
-  `statistic_date` date NOT NULL COMMENT '统计日期',
-  `statistic_period` varchar(20) NOT NULL COMMENT '统计周期（hourly-小时、daily-日、weekly-周、monthly-月）',
-  `sample_count` int DEFAULT NULL COMMENT '采集样本数',
-  `avg_load_percent` decimal(5,2) DEFAULT NULL COMMENT '平均负载百分比（%）',
-  `max_load_percent` decimal(5,2) DEFAULT NULL COMMENT '最大负载百分比（%）',
-  `min_load_percent` decimal(5,2) DEFAULT NULL COMMENT '最小负载百分比（%）',
-  `peak_load_time` datetime DEFAULT NULL COMMENT '峰值负载时间',
-  `load_std_dev` decimal(8,4) DEFAULT NULL COMMENT '负载标准差',
-  `avg_active_power` decimal(10,2) DEFAULT NULL COMMENT '平均有功功率（kW）',
-  `max_active_power` decimal(10,2) DEFAULT NULL COMMENT '最大有功功率（kW）',
-  `total_energy_consumption` decimal(12,2) DEFAULT NULL COMMENT '累计耗电量（kWh）',
-  `load_trend` varchar(20) DEFAULT NULL COMMENT '负载变化趋势（up-上升、down-下降、stable-稳定）',
-  `consecutive_up_days` int DEFAULT 0 COMMENT '连续上升天数',
-  `consecutive_down_days` int DEFAULT 0 COMMENT '连续下降天数',
-  `seven_day_growth_rate` decimal(8,2) DEFAULT NULL COMMENT '7日负载增长率（%）',
-  `thirty_day_growth_rate` decimal(8,2) DEFAULT NULL COMMENT '30日负载增长率（%）',
-  `need_capacity_alert` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否需要容量预警',
-  `alert_level` varchar(20) DEFAULT NULL COMMENT '预警等级（info-信息、warning-警告、critical-严重）',
-  `alert_threshold` decimal(5,2) DEFAULT NULL COMMENT '预警阈值（%）',
-  `days_to_threshold` int DEFAULT NULL COMMENT '预计达到阈值天数',
-  `alert_report` text DEFAULT NULL COMMENT '预警报告（Markdown格式）',
-  `suggestions` text DEFAULT NULL COMMENT '建议措施（JSON格式）',
-  `capacity_utilization` decimal(5,2) DEFAULT NULL COMMENT '当前容量利用率（%）',
-  `remaining_capacity` decimal(10,2) DEFAULT NULL COMMENT '剩余容量（kW）',
-  `estimated_days_to_full_load` int DEFAULT NULL COMMENT '预计满载天数',
-  `expansion_suggestion` text DEFAULT NULL COMMENT '扩容建议（JSON格式）',
-  `extra_data` text DEFAULT NULL COMMENT '扩展字段（JSON格式）',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除标志',
-  PRIMARY KEY (`id`),
-  KEY `idx_power_system_id` (`power_system_id`),
-  KEY `idx_device_code` (`device_code`),
-  KEY `idx_statistic_date` (`statistic_date`),
-  KEY `idx_statistic_period` (`statistic_period`),
-  KEY `idx_need_capacity_alert` (`need_capacity_alert`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='电力趋势表';
-
--- 插入示例电力设备
-INSERT INTO `power_system` (`device_code`, `device_name`, `device_type`, `brand`, `model`, `room_id`, `room_name`, `location`, `rated_capacity`, `protocol`, `monitor_address`, `monitor_port`, `collect_interval`, `status`) VALUES
-('PWR-UPS-001', '机房A UPS主设备', 'ups', 'APC', 'Smart-UPS 3000VA', 1, '机房A-101', 'A区配电间', 3.00, 'snmp', '192.168.1.100', 161, 60, 'online'),
-('PWR-PDU-001', '机房A PDU-01', 'pdu', 'Schneider', 'AP8868', 1, '机房A-101', 'A区第一排', 22.00, 'modbus', '192.168.1.101', 502, 60, 'online'),
-('PWR-PDU-002', '机房A PDU-02', 'pdu', 'Schneider', 'AP8868', 1, '机房A-101', 'A区第二排', 22.00, 'modbus', '192.168.1.102', 502, 60, 'online'),
-('PWR-MAIN-001', '市电输入总开关', 'main_power', 'Schneider', 'MasterPact NT', 1, '机房A-101', '配电间', 630.00, 'modbus', '192.168.1.103', 502, 60, 'online');
-
--- ============================================
--- 环境系统监控与能效优化模块
--- ============================================
-
--- 环境传感器表
-CREATE TABLE IF NOT EXISTS `environment_sensor` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `sensor_name` varchar(100) NOT NULL COMMENT '传感器名称',
-  `sensor_type` varchar(20) NOT NULL COMMENT '传感器类型（TEMPERATURE-温湿度、WATER-漏水、SMOKE-烟感）',
-  `device_id` bigint DEFAULT NULL COMMENT '设备ID（关联设备管理表）',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID（关联机房管理表）',
-  `location` varchar(200) DEFAULT NULL COMMENT '安装位置描述',
-  `coordinate_x` double DEFAULT NULL COMMENT '坐标X（用于热力图绘制）',
-  `coordinate_y` double DEFAULT NULL COMMENT '坐标Y（用于热力图绘制）',
-  `ip_address` varchar(50) DEFAULT NULL COMMENT '传感器IP地址',
-  `port` int DEFAULT NULL COMMENT '传感器端口',
-  `protocol_type` varchar(20) DEFAULT NULL COMMENT '协议类型（MODBUS、SNMP、BACNET、HTTP）',
-  `register_address` int DEFAULT NULL COMMENT '寄存器地址（Modbus）',
-  `snmp_oid` varchar(200) DEFAULT NULL COMMENT 'SNMP OID',
-  `collect_interval` int DEFAULT 300 COMMENT '采集频率（秒）',
-  `temp_threshold_high` double DEFAULT NULL COMMENT '温度阈值上限（℃）',
-  `temp_threshold_low` double DEFAULT NULL COMMENT '温度阈值下限（℃）',
-  `humidity_threshold_high` double DEFAULT NULL COMMENT '湿度阈值上限（%）',
-  `humidity_threshold_low` double DEFAULT NULL COMMENT '湿度阈值下限（%）',
-  `status` varchar(20) DEFAULT 'NORMAL' COMMENT '状态（NORMAL-正常、ALARM-告警、OFFLINE-离线）',
-  `last_collect_time` datetime DEFAULT NULL COMMENT '最后采集时间',
-  `remark` text DEFAULT NULL COMMENT '备注信息',
-  `created_by` bigint DEFAULT NULL COMMENT '创建人',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_by` bigint DEFAULT NULL COMMENT '更新人',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除标志',
-  PRIMARY KEY (`id`),
-  KEY `idx_sensor_type` (`sensor_type`),
-  KEY `idx_device_id` (`device_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='环境传感器表';
-
--- 环境数据表
-CREATE TABLE IF NOT EXISTS `environment_data` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `sensor_id` bigint DEFAULT NULL COMMENT '传感器ID',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `data_type` varchar(20) NOT NULL COMMENT '数据类型（TEMPERATURE-温度、HUMIDITY-湿度、WATER-漏水、SMOKE-烟感）',
-  `value` double DEFAULT NULL COMMENT '数值',
-  `unit` varchar(20) DEFAULT NULL COMMENT '单位（℃、%、无单位）',
-  `is_alarm` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否告警（0-正常、1-告警）',
-  `alarm_level` varchar(20) DEFAULT NULL COMMENT '告警级别（INFO-信息、WARNING-警告、CRITICAL-严重）',
-  `alarm_message` varchar(500) DEFAULT NULL COMMENT '告警信息',
-  `collect_time` datetime NOT NULL COMMENT '采集时间',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_sensor_id` (`sensor_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_data_type` (`data_type`),
-  KEY `idx_collect_time` (`collect_time`),
-  KEY `idx_is_alarm` (`is_alarm`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='环境数据表';
-
--- 热力图数据表
-CREATE TABLE IF NOT EXISTS `heatmap_data` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `heatmap_type` varchar(20) NOT NULL COMMENT '热力图类型（TEMPERATURE-温度热力图、HUMIDITY-湿度热力图）',
-  `coordinate_x` double DEFAULT NULL COMMENT '坐标X',
-  `coordinate_y` double DEFAULT NULL COMMENT '坐标Y',
-  `temperature` double DEFAULT NULL COMMENT '温度值（热力图类型为温度时）',
-  `humidity` double DEFAULT NULL COMMENT '湿度值（热力图类型为湿度时）',
-  `heat_value` double DEFAULT NULL COMMENT '热力值（0-1之间，用于热力图渲染）',
-  `is_abnormal` tinyint(1) NOT NULL DEFAULT 0 COMMENT '是否异常区域（0-正常、1-异常）',
-  `abnormal_type` varchar(50) DEFAULT NULL COMMENT '异常类型（HIGH_TEMP-高温、LOW_TEMP-低温、HIGH_HUMIDITY-高湿、LOW_HUMIDITY-低湿）',
-  `data_time` datetime NOT NULL COMMENT '数据时间',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_heatmap_type` (`heatmap_type`),
-  KEY `idx_data_time` (`data_time`),
-  KEY `idx_is_abnormal` (`is_abnormal`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='热力图数据表';
-
--- 能效优化工单表
-CREATE TABLE IF NOT EXISTS `energy_efficiency_order` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `order_no` varchar(50) NOT NULL COMMENT '工单编号',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `order_type` varchar(50) NOT NULL COMMENT '工单类型（HIGH_TEMP-高温检查、HUMIDITY_RISE-湿度排查、COLD_AIR-冷通道检查、AIR_DUCT-风道检查）',
-  `title` varchar(200) NOT NULL COMMENT '工单标题',
-  `description` text DEFAULT NULL COMMENT '工单描述',
-  `trigger_condition` varchar(200) DEFAULT NULL COMMENT '触发条件（持续高温、湿度缓升等）',
-  `trigger_value` double DEFAULT NULL COMMENT '触发值',
-  `trigger_time` datetime NOT NULL COMMENT '触发时间',
-  `abnormal_area_id` bigint DEFAULT NULL COMMENT '异常区域ID',
-  `abnormal_area` varchar(200) DEFAULT NULL COMMENT '异常区域描述',
-  `priority` varchar(20) DEFAULT 'MEDIUM' COMMENT '优先级（LOW-低、MEDIUM-中、HIGH-高、URGENT-紧急）',
-  `status` varchar(20) DEFAULT 'PENDING' COMMENT '工单状态（PENDING-待处理、PROCESSING-处理中、COMPLETED-已完成、CLOSED-已关闭）',
-  `assignee_id` bigint DEFAULT NULL COMMENT '负责人ID',
-  `assignee_name` varchar(50) DEFAULT NULL COMMENT '负责人姓名',
-  `assign_time` datetime DEFAULT NULL COMMENT '指派时间',
-  `plan_complete_time` datetime DEFAULT NULL COMMENT '计划完成时间',
-  `actual_complete_time` datetime DEFAULT NULL COMMENT '实际完成时间',
-  `result` text DEFAULT NULL COMMENT '处理结果',
-  `suggestion` text DEFAULT NULL COMMENT '处理建议',
-  `attachment_id` bigint DEFAULT NULL COMMENT '附件ID',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `created_by` bigint DEFAULT NULL COMMENT '创建人',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_by` bigint DEFAULT NULL COMMENT '更新人',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `deleted` tinyint(1) NOT NULL DEFAULT 0 COMMENT '逻辑删除标志',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_order_no` (`order_no`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_order_type` (`order_type`),
-  KEY `idx_status` (`status`),
-  KEY `idx_priority` (`priority`),
-  KEY `idx_trigger_time` (`trigger_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='能效优化工单表';
-
--- 插入示例环境传感器
-INSERT INTO `environment_sensor` (`sensor_name`, `sensor_type`, `device_id`, `room_id`, `location`, `coordinate_x`, `coordinate_y`, `ip_address`, `port`, `protocol_type`, `collect_interval`, `temp_threshold_high`, `temp_threshold_low`, `humidity_threshold_high`, `humidity_threshold_low`, `status`) VALUES
-('机房A-01温湿度传感器', 'TEMPERATURE', 1, 1, 'A区第一排', 100.0, 150.0, '192.168.1.200', 502, 'MODBUS', 60, 28.0, 18.0, 70.0, 40.0, 'NORMAL'),
-('机房A-02温湿度传感器', 'TEMPERATURE', 1, 1, 'A区第二排', 200.0, 150.0, '192.168.1.201', 502, 'MODBUS', 60, 28.0, 18.0, 70.0, 40.0, 'NORMAL'),
-('机房A-03温湿度传感器', 'TEMPERATURE', 1, 1, 'B区第一排', 100.0, 300.0, '192.168.1.202', 502, 'MODBUS', 60, 28.0, 18.0, 70.0, 40.0, 'NORMAL'),
-('机房A-漏水检测器', 'WATER', 1, 1, 'A区空调下方', 150.0, 100.0, '192.168.1.210', 502, 'MODBUS', 30, NULL, NULL, NULL, NULL, 'NORMAL'),
-('机房A-烟感传感器', 'SMOKE', 1, 1, '机房A主入口', 50.0, 50.0, '192.168.1.220', 502, 'MODBUS', 30, NULL, NULL, NULL, NULL, 'NORMAL');
-
--- 插入示例环境数据
-INSERT INTO `environment_data` (`sensor_id`, `room_id`, `data_type`, `value`, `unit`, `is_alarm`, `alarm_level`, `collect_time`) VALUES
-(1, 1, 'TEMPERATURE', 22.5, '℃', 0, NULL, NOW()),
-(1, 1, 'HUMIDITY', 55.0, '%', 0, NULL, NOW()),
-(2, 1, 'TEMPERATURE', 23.0, '℃', 0, NULL, NOW()),
-(2, 1, 'HUMIDITY', 56.0, '%', 0, NULL, NOW()),
-(3, 1, 'TEMPERATURE', 21.5, '℃', 0, NULL, NOW()),
-(3, 1, 'HUMIDITY', 54.0, '%', 0, NULL, NOW()),
-(4, 1, 'WATER', 0.0, '', 0, NULL, NOW()),
-(5, 1, 'SMOKE', 0.0, '', 0, NULL, NOW());
-
--- ============================================
--- 精密空调运行监控模块
--- ============================================
-
--- 精密空调表
-CREATE TABLE IF NOT EXISTS `air_conditioner` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `ac_code` varchar(50) NOT NULL COMMENT '空调编号',
-  `ac_name` varchar(100) NOT NULL COMMENT '空调名称',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `location` varchar(200) DEFAULT NULL COMMENT '安装位置',
-  `brand` varchar(50) DEFAULT NULL COMMENT '品牌',
-  `model` varchar(100) DEFAULT NULL COMMENT '型号',
-  `cooling_capacity` double DEFAULT NULL COMMENT '制冷量(kW)',
-  `run_mode` int NOT NULL DEFAULT 0 COMMENT '当前运行模式（0-关闭，1-制冷，2-制热，3-除湿，4-通风）',
-  `set_temperature` double DEFAULT NULL COMMENT '设定温度(℃)',
-  `current_return_temp` double DEFAULT NULL COMMENT '当前回风温度(℃)',
-  `current_return_humidity` double DEFAULT NULL COMMENT '当前回风湿度(%)',
-  `compressor_runtime_hours` double NOT NULL DEFAULT 0.0 COMMENT '压缩机累计运行时长(小时)',
-  `last_maintenance_time` datetime DEFAULT NULL COMMENT '上次保养时间',
-  `next_maintenance_time` datetime DEFAULT NULL COMMENT '下次保养时间',
-  `maintenance_threshold` double NOT NULL DEFAULT 1000.0 COMMENT '保养阈值(小时)，达到此阈值自动触发保养工单',
-  `status` int NOT NULL DEFAULT 0 COMMENT '状态（0-正常，1-告警，2-离线）',
-  `last_collect_time` datetime DEFAULT NULL COMMENT '最后采集时间',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_ac_code` (`ac_code`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_run_mode` (`run_mode`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='精密空调表';
-
--- 空调运行数据表
-CREATE TABLE IF NOT EXISTS `air_conditioner_data` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `ac_id` bigint DEFAULT NULL COMMENT '空调ID',
-  `ac_code` varchar(50) DEFAULT NULL COMMENT '空调编号',
-  `run_mode` int NOT NULL DEFAULT 0 COMMENT '运行模式（0-关闭，1-制冷，2-制热，3-除湿，4-通风）',
-  `set_temperature` double DEFAULT NULL COMMENT '设定温度(℃)',
-  `return_temperature` double DEFAULT NULL COMMENT '回风温度(℃)',
-  `return_humidity` double DEFAULT NULL COMMENT '回风湿度(%)',
-  `supply_temperature` double DEFAULT NULL COMMENT '送风温度(℃)',
-  `compressor1_status` int NOT NULL DEFAULT 0 COMMENT '压缩机1状态（0-停止，1-运行）',
-  `compressor2_status` int NOT NULL DEFAULT 0 COMMENT '压缩机2状态（0-停止，1-运行）',
-  `fan1_status` int NOT NULL DEFAULT 0 COMMENT '风机1状态（0-停止，1-运行）',
-  `fan2_status` int NOT NULL DEFAULT 0 COMMENT '风机2状态（0-停止，1-运行）',
-  `humidifier_status` int NOT NULL DEFAULT 0 COMMENT '加湿器状态（0-停止，1-运行）',
-  `heater_status` int NOT NULL DEFAULT 0 COMMENT '电加热器状态（0-关闭，1-开启）',
-  `current_power` double DEFAULT NULL COMMENT '当前功率(kW)',
-  `temperature_diff` double DEFAULT NULL COMMENT '温差：回风温度 - 设定温度',
-  `is_diff_abnormal` int NOT NULL DEFAULT 0 COMMENT '是否温差异常（0-正常，1-异常）',
-  `collect_time` datetime NOT NULL COMMENT '采集时间',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_ac_id` (`ac_id`),
-  KEY `idx_ac_code` (`ac_code`),
-  KEY `idx_collect_time` (`collect_time`),
-  KEY `idx_is_diff_abnormal` (`is_diff_abnormal`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='空调运行数据表';
-
--- 效率核查工单表
-CREATE TABLE IF NOT EXISTS `efficiency_check_order` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `order_no` varchar(50) NOT NULL COMMENT '工单编号',
-  `ac_id` bigint DEFAULT NULL COMMENT '空调ID',
-  `ac_code` varchar(50) DEFAULT NULL COMMENT '空调编号',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `order_type` int NOT NULL COMMENT '工单类型（1-制冷效率检查，2-滤网清洁检查，3-预防性保养）',
-  `trigger_reason` varchar(500) DEFAULT NULL COMMENT '触发原因',
-  `abnormal_detail` text DEFAULT NULL COMMENT '异常详情：温差异常描述、压缩机时长等',
-  `priority` int NOT NULL DEFAULT 3 COMMENT '优先级（1-紧急，2-高，3-中，4-低）',
-  `status` int NOT NULL DEFAULT 0 COMMENT '工单状态（0-待指派，1-待处理，2-处理中，3-已完成，4-已取消）',
-  `assignee` varchar(50) DEFAULT NULL COMMENT '指派人',
-  `assign_time` datetime DEFAULT NULL COMMENT '指派时间',
-  `start_time` datetime DEFAULT NULL COMMENT '开始处理时间',
-  `complete_time` datetime DEFAULT NULL COMMENT '完成时间',
-  `handle_result` text DEFAULT NULL COMMENT '处理结果',
-  `handle_description` text DEFAULT NULL COMMENT '处理描述',
-  `photos` text DEFAULT NULL COMMENT '现场照片',
-  `remark` text DEFAULT NULL COMMENT '工单备注',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_order_no` (`order_no`),
-  KEY `idx_ac_id` (`ac_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_order_type` (`order_type`),
-  KEY `idx_status` (`status`),
-  KEY `idx_priority` (`priority`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='效率核查工单表';
-
--- 插入示例精密空调
-INSERT INTO `air_conditioner` (`ac_code`, `ac_name`, `room_id`, `location`, `brand`, `model`, `cooling_capacity`, `run_mode`, `set_temperature`, `current_return_temp`, `current_return_humidity`, `compressor_runtime_hours`, `maintenance_threshold`, `status`) VALUES
-('AC-001', '机房A精密空调1', 1, 'A区西北角', 'Liebert', 'iCOM-CM60', 60.0, 1, 22.0, 23.0, 55.0, 5000.5, 10000.0, 0),
-('AC-002', '机房A精密空调2', 1, 'A区东南角', 'Emerson', 'XD 80', 80.0, 1, 22.0, 22.5, 54.0, 4500.0, 10000.0, 0),
-('AC-003', '机房B精密空调1', 2, '机房中心', 'Liebert', 'iCOM-CM40', 40.0, 1, 22.0, 23.5, 56.0, 3000.0, 10000.0, 0);
-
--- ============================================
--- 消防保障系统监控模块
--- ============================================
-
--- 灭火器表
-CREATE TABLE IF NOT EXISTS `fire_extinguisher` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `extinguisher_code` varchar(50) NOT NULL COMMENT '灭火器编号',
-  `extinguisher_name` varchar(100) NOT NULL COMMENT '灭火器名称',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `location` varchar(200) DEFAULT NULL COMMENT '安装位置',
-  `extinguisher_type` int NOT NULL DEFAULT 1 COMMENT '灭火器类型（1-干粉，2-二氧化碳，3-七氟丙烷，4-其他）',
-  `specification` varchar(50) DEFAULT NULL COMMENT '规格(如：4kg、50kg)',
-  `manufacturer` varchar(100) DEFAULT NULL COMMENT '生产厂家',
-  `manufacture_date` datetime DEFAULT NULL COMMENT '出厂日期',
-  `last_refill_date` datetime DEFAULT NULL COMMENT '上次充装日期',
-  `next_refill_date` datetime DEFAULT NULL COMMENT '下次充装日期',
-  `rated_pressure` double DEFAULT NULL COMMENT '额定压力(MPa)',
-  `current_pressure` double DEFAULT NULL COMMENT '当前压力(MPa)',
-  `pressure_status` int NOT NULL DEFAULT 0 COMMENT '压力状态（0-正常，1-偏低，2-偏低预警，3-异常）',
-  `weight` double DEFAULT NULL COMMENT '重量(kg)',
-  `current_weight` double DEFAULT NULL COMMENT '当前重量(kg)，来自智能称重传感器',
-  `weight_status` int NOT NULL DEFAULT 0 COMMENT '重量状态（0-正常，1-偏低，2-偏低预警，3-异常）',
-  `pressure_meter_type` int NOT NULL DEFAULT 0 COMMENT '压力表类型（0-模拟表，1-数字压力表）',
-  `support_weighing` int NOT NULL DEFAULT 0 COMMENT '是否支持智能称重（0-不支持，1-支持）',
-  `pressure_sensor_id` varchar(100) DEFAULT NULL COMMENT '数字压力表传感器ID',
-  `weighing_sensor_id` varchar(100) DEFAULT NULL COMMENT '智能称重传感器ID',
-  `pressure_alert_threshold` double NOT NULL DEFAULT 0.8 COMMENT '压力预警阈值(MPa)，低于此值触发预警',
-  `pressure_abnormal_threshold` double NOT NULL DEFAULT 0.6 COMMENT '压力异常阈值(MPa)，低于此值触发异常',
-  `weight_alert_threshold` double DEFAULT NULL COMMENT '重量预警阈值(kg)，低于此值触发预警',
-  `weight_abnormal_threshold` double DEFAULT NULL COMMENT '重量异常阈值(kg)，低于此值触发异常',
-  `status` int NOT NULL DEFAULT 0 COMMENT '状态（0-正常，1-告警，2-离线）',
-  `last_collect_time` datetime DEFAULT NULL COMMENT '最后采集时间',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_extinguisher_code` (`extinguisher_code`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_extinguisher_type` (`extinguisher_type`),
-  KEY `idx_pressure_status` (`pressure_status`),
-  KEY `idx_weight_status` (`weight_status`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='灭火器表';
-
--- 灭火器检查记录表
-CREATE TABLE IF NOT EXISTS `fire_extinguisher_check` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `check_no` varchar(50) NOT NULL COMMENT '检查记录编号',
-  `extinguisher_id` bigint DEFAULT NULL COMMENT '灭火器ID',
-  `extinguisher_code` varchar(50) DEFAULT NULL COMMENT '灭火器编号',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `check_type` int NOT NULL COMMENT '检查类型（1-月度称重与外观检查，2-紧急确认，3-年度检查）',
-  `checker` varchar(50) DEFAULT NULL COMMENT '检查人',
-  `check_time` datetime DEFAULT NULL COMMENT '检查时间',
-  `pressure_value` double DEFAULT NULL COMMENT '压力值(MPa)',
-  `pressure_status` int NOT NULL DEFAULT 0 COMMENT '压力状态（0-正常，1-偏低，2-异常）',
-  `weight_value` double DEFAULT NULL COMMENT '重量值(kg)',
-  `weight_status` int NOT NULL DEFAULT 0 COMMENT '重量状态（0-正常，1-偏低，2-异常）',
-  `appearance_status` int NOT NULL DEFAULT 0 COMMENT '外观检查结果（0-完好，1-轻微损坏，2-严重损坏）',
-  `appearance_description` varchar(500) DEFAULT NULL COMMENT '外观检查描述',
-  `photos` text DEFAULT NULL COMMENT '检查照片',
-  `need_refill` int NOT NULL DEFAULT 0 COMMENT '是否需要充装（0-否，1-是）',
-  `refill_remark` varchar(500) DEFAULT NULL COMMENT '充装备注',
-  `check_result` int NOT NULL DEFAULT 0 COMMENT '检查结果（0-合格，1-不合格）',
-  `handling_measures` text DEFAULT NULL COMMENT '处理措施',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_check_no` (`check_no`),
-  KEY `idx_extinguisher_id` (`extinguisher_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_check_type` (`check_type`),
-  KEY `idx_check_time` (`check_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='灭火器检查记录表';
-
--- 消防主机日志表
-CREATE TABLE IF NOT EXISTS `fire_host_log` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `host_id` bigint DEFAULT NULL COMMENT '消防主机ID',
-  `host_code` varchar(50) DEFAULT NULL COMMENT '消防主机编号',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `signal_type` int NOT NULL COMMENT '信号类型（1-一般信号，2-火警信号，3-故障信号，4-故障恢复）',
-  `loop_no` varchar(50) DEFAULT NULL COMMENT '回路号',
-  `detector_address` varchar(50) DEFAULT NULL COMMENT '探测器地址',
-  `detector_type` int DEFAULT NULL COMMENT '探测器类型（1-感烟，2-感温，3-感光，4-手动报警按钮，5-输入模块，6-输出模块）',
-  `detector_location` varchar(200) DEFAULT NULL COMMENT '探测器位置',
-  `signal_description` varchar(500) DEFAULT NULL COMMENT '信号描述',
-  `signal_time` datetime NOT NULL COMMENT '信号时间',
-  `confirmed` int NOT NULL DEFAULT 0 COMMENT '是否已确认（0-未确认，1-已确认）',
-  `confirmer` varchar(50) DEFAULT NULL COMMENT '确认人',
-  `confirm_time` datetime DEFAULT NULL COMMENT '确认时间',
-  `confirm_remark` varchar(500) DEFAULT NULL COMMENT '确认备注',
-  `handled` int NOT NULL DEFAULT 0 COMMENT '是否已处理（0-未处理，1-已处理）',
-  `handler` varchar(50) DEFAULT NULL COMMENT '处理人',
-  `handle_time` datetime DEFAULT NULL COMMENT '处理时间',
-  `handle_result` varchar(500) DEFAULT NULL COMMENT '处理结果',
-  `alert_status` int NOT NULL DEFAULT 0 COMMENT '告警状态（0-未发送，1-已发送）',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  PRIMARY KEY (`id`),
-  KEY `idx_host_id` (`host_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_signal_type` (`signal_type`),
-  KEY `idx_signal_time` (`signal_time`),
-  KEY `idx_confirmed` (`confirmed`),
-  KEY `idx_handled` (`handled`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消防主机日志表';
-
--- 气体压力监控表
-CREATE TABLE IF NOT EXISTS `gas_pressure_monitor` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `system_id` bigint DEFAULT NULL COMMENT '灭火系统ID',
-  `system_code` varchar(50) NOT NULL COMMENT '系统编号',
-  `system_name` varchar(100) NOT NULL COMMENT '系统名称',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `gas_type` int NOT NULL DEFAULT 1 COMMENT '灭火气体类型（1-七氟丙烷，2-IG541，3-二氧化碳）',
-  `bottle_code` varchar(50) NOT NULL COMMENT '钢瓶编号',
-  `bottle_location` varchar(200) DEFAULT NULL COMMENT '钢瓶位置',
-  `rated_pressure` double NOT NULL COMMENT '额定压力(MPa)',
-  `current_pressure` double DEFAULT NULL COMMENT '当前压力(MPa)',
-  `pressure_status` int NOT NULL DEFAULT 0 COMMENT '压力状态（0-正常，1-偏低，2-预警，3-异常）',
-  `alert_threshold` double NOT NULL DEFAULT 1.5 COMMENT '预警阈值(MPa)',
-  `abnormal_threshold` double NOT NULL DEFAULT 1.0 COMMENT '异常阈值(MPa)',
-  `sensor_id` varchar(100) DEFAULT NULL COMMENT '压力传感器ID',
-  `last_collect_time` datetime DEFAULT NULL COMMENT '最后采集时间',
-  `status` int NOT NULL DEFAULT 0 COMMENT '状态（0-正常，1-告警，2-离线）',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_system_code` (`system_code`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_gas_type` (`gas_type`),
-  KEY `idx_pressure_status` (`pressure_status`),
-  KEY `idx_status` (`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='气体压力监控表';
-
--- 消防设施审验提醒表
-CREATE TABLE IF NOT EXISTS `fire_inspection_reminder` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
-  `reminder_no` varchar(50) NOT NULL COMMENT '提醒编号',
-  `facility_id` bigint DEFAULT NULL COMMENT '设施ID',
-  `facility_name` varchar(100) NOT NULL COMMENT '设施名称',
-  `facility_type` int NOT NULL COMMENT '设施类型（1-灭火器，2-气体灭火系统，3-消防主机，4-消防栓，5-喷淋系统，6-应急照明）',
-  `room_id` bigint DEFAULT NULL COMMENT '机房ID',
-  `facility_code` varchar(50) DEFAULT NULL COMMENT '设施编号',
-  `facility_location` varchar(200) DEFAULT NULL COMMENT '设施位置',
-  `inspection_type` int NOT NULL COMMENT '审验类型（1-年度检查，2-充装检查，3-专业检测，4-法定审验）',
-  `last_inspection_date` date DEFAULT NULL COMMENT '上次审验日期',
-  `inspection_period` int NOT NULL COMMENT '法定审验周期(月)',
-  `next_inspection_date` date NOT NULL COMMENT '下次审验日期',
-  `reminder_type` int NOT NULL COMMENT '提醒类型（1-提前30天，2-提前7天，3-提前1天）',
-  `reminder_content` text DEFAULT NULL COMMENT '提醒内容',
-  `reminder_date` date NOT NULL COMMENT '提醒日期',
-  `handled` int NOT NULL DEFAULT 0 COMMENT '是否已处理（0-未处理，1-已处理）',
-  `handler` varchar(50) DEFAULT NULL COMMENT '处理人',
-  `handle_time` datetime DEFAULT NULL COMMENT '处理时间',
-  `handle_result` varchar(500) DEFAULT NULL COMMENT '处理结果',
-  `remark` text DEFAULT NULL COMMENT '备注',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  `create_by` varchar(50) DEFAULT NULL COMMENT '创建人',
-  `update_by` varchar(50) DEFAULT NULL COMMENT '更新人',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_reminder_no` (`reminder_no`),
-  KEY `idx_facility_id` (`facility_id`),
-  KEY `idx_room_id` (`room_id`),
-  KEY `idx_facility_type` (`facility_type`),
-  KEY `idx_reminder_date` (`reminder_date`),
-  KEY `idx_handled` (`handled`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='消防设施审验提醒表';
-
--- 插入示例灭火器
-INSERT INTO `fire_extinguisher` (`extinguisher_code`, `extinguisher_name`, `room_id`, `location`, `extinguisher_type`, `specification`, `manufacturer`, `manufacture_date`, `rated_pressure`, `current_pressure`, `weight`, `current_weight`, `pressure_meter_type`, `support_weighing`, `pressure_alert_threshold`, `pressure_abnormal_threshold`, `status`) VALUES
-('FE-001', '机房A-01灭火器', 1, '机房A入口左侧', 1, '4kg ABC干粉', '北消', '2023-01-15', 1.2, 1.2, 4.0, 4.0, 1, 1, 0.8, 0.6, 0),
-('FE-002', '机房A-02灭火器', 1, '机房A入口右侧', 1, '4kg ABC干粉', '北消', '2023-01-15', 1.2, 1.18, 4.0, 4.0, 1, 1, 0.8, 0.6, 0),
-('FE-003', '机房B-01灭火器', 2, '机房B入口左侧', 1, '4kg ABC干粉', '北消', '2023-03-20', 1.2, 1.19, 4.0, 4.0, 1, 1, 0.8, 0.6, 0),
-('FE-004', '机房A-01二氧化碳灭火器', 1, '机房A配电室', 2, '7kg', '中消', '2023-02-10', 5.5, 5.5, 7.0, 7.0, 1, 0, 4.5, 3.5, 0);
-
--- 插入示例气体灭火系统
-INSERT INTO `gas_pressure_monitor` (`system_code`, `system_name`, `room_id`, `gas_type`, `bottle_code`, `bottle_location`, `rated_pressure`, `current_pressure`, `alert_threshold`, `abnormal_threshold`, `status`) VALUES
-('GAS-001', '机房A七氟丙烷灭火系统', 1, 1, 'BOTTLE-001', '机房A气瓶间', 2.5, 2.48, 1.5, 1.0, 0),
-('GAS-002', '机房A七氟丙烷灭火系统', 1, 1, 'BOTTLE-002', '机房A气瓶间', 2.5, 2.49, 1.5, 1.0, 0),
-('GAS-003', '机房B七氟丙烷灭火系统', 2, 1, 'BOTTLE-003', '机房B气瓶间', 2.5, 2.47, 1.5, 1.0, 0);
-
+SELECT '数据库初始化完成！' AS message;
+SELECT '默认管理员：admin / Admin@123' AS admin_info;
