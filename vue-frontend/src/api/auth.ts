@@ -13,6 +13,49 @@ export const login = (data: LoginForm) => {
 }
 
 /**
+ * 获取SSO登录URL
+ */
+export const getSsoLoginUrl = (ssoConfigId?: string, state?: string) => {
+  return request<{ data: string }>({
+    url: '/sso/login-url',
+    method: 'get',
+    params: { ssoConfigId, state }
+  })
+}
+
+/**
+ * 获取SSO退出URL
+ */
+export const getSsoLogoutUrl = (ssoConfigId?: string, redirectUrl?: string) => {
+  return request<{ data: string }>({
+    url: '/sso/logout-url',
+    method: 'get',
+    params: { ssoConfigId, redirectUrl }
+  })
+}
+
+/**
+ * 获取SSO配置信息
+ */
+export const getSsoConfig = () => {
+  return request<{ data: any }>({
+    url: '/sso/config',
+    method: 'get'
+  })
+}
+
+/**
+ * 会话保持
+ */
+export const keepSession = (accessToken: string) => {
+  return request<{ data: any }>({
+    url: '/sso/keep-session',
+    method: 'post',
+    params: { accessToken }
+  })
+}
+
+/**
  * OAuth2.0 SSO登录回调
  */
 export const oauthCallback = (provider: string, code: string, state: string) => {

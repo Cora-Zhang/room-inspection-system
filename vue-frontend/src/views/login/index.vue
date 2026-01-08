@@ -40,6 +40,16 @@
             登录
           </el-button>
         </el-form-item>
+        <el-form-item>
+          <el-button
+            size="large"
+            class="sso-btn"
+            :loading="ssoLoading"
+            @click="handleSsoLogin"
+          >
+            <span>SSO单点登录</span>
+          </el-button>
+        </el-form-item>
       </el-form>
     </div>
   </div>
@@ -47,13 +57,16 @@
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
+import { getSsoLoginUrl } from '@/api/auth'
 
 const router = useRouter()
+const route = useRoute()
 const loginFormRef = ref<FormInstance>()
 const loading = ref(false)
+const ssoLoading = ref(false)
 
 const loginForm = reactive({
   username: '',
@@ -85,6 +98,27 @@ const handleLogin = async () => {
       }, 1000)
     }
   })
+}
+
+// SSO单点登录
+const handleSsoLogin = async () => {
+  ssoLoading.value = true
+  try {
+    const state = btoa(JSON.stringify({
+      redirect: route.query.redirect || '/',
+      timestamp: Date.now()
+    }))
+
+    const res = await getSsoLoginUrl(undefined, state)
+    if (res.data) {
+      // 跳转到IAM认证服务器
+      window.location.href = res.data
+    }
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取SSO登录URL失败')
+  } finally {
+    ssoLoading.value = false
+  }
 }
 </script>
 
@@ -186,6 +220,28 @@ const handleLogin = async () => {
 
       &:active {
         transform: translateY(0);
+      }
+    }
+
+    .sso-btn {
+      width: 100%;
+      background: transparent;
+      border: 2px solid #7b2ff7;
+      color: #7b2ff7;
+      font-size: 16px;
+      font-weight: 500;
+      height: 44px;
+      border-radius: 6px;
+      transition: all 0.3s;
+
+      &:hover {
+        background: rgba(123, 47, 247, 0.1);
+        border-color: #9b4ff7;
+        color: #9b4ff7;
+      }
+
+      &:active {
+        transform: scale(0.98);
       }
     }
   }
