@@ -198,6 +198,156 @@ audit-log:
   async: true
   # 是否记录请求参数
   log-params: true
+
+# ==================== 高可用与可靠性配置 ====================
+# 高可用配置
+ha:
+  # 服务实例配置
+  instance:
+    # 实例ID（默认自动生成）
+    id: ${INSTANCE_ID:}
+    # 实例权重
+    weight: ${INSTANCE_WEIGHT:100}
+    # 是否为主节点
+    primary: ${INSTANCE_PRIMARY:false}
+
+  # 负载均衡配置
+  load-balance:
+    # 负载均衡策略（ROUND_ROBIN/WEIGHTED/RANDOM）
+    strategy: ${LB_STRATEGY:ROUND_ROBIN}
+    # 健康检查间隔（秒）
+    health-check-interval: 30
+    # 故障切换阈值（连续失败次数）
+    failover-threshold: 3
+
+  # 故障切换配置
+  failover:
+    # 是否启用自动故障切换
+    enabled: ${FAILOVER_ENABLED:true}
+    # 故障检测间隔（秒）
+    check-interval: 10
+    # 故障切换超时（秒）
+    timeout: 30
+
+# ==================== 监控与健康检查配置 ====================
+# 健康检查配置
+health-check:
+  # 是否启用健康检查
+  enabled: true
+  # 检查间隔（秒）
+  interval: 30
+  # 检查超时（毫秒）
+  timeout: 5000
+  # 失败阈值（连续失败次数）
+  failure-threshold: 3
+
+# 监控指标配置
+metrics:
+  # 是否启用监控指标采集
+  enabled: true
+  # 采集间隔（秒）
+  interval: 60
+  # 数据保留天数
+  retain-days: 7
+  # 指标采集线程池配置
+  thread-pool:
+    core-size: 5
+    max-size: 10
+    queue-capacity: 100
+
+# ==================== 数据库备份配置 ====================
+# 数据库备份配置
+backup:
+  # 备份文件存储路径
+  path: ${BACKUP_PATH:/tmp/backups}
+  # 是否启用自动备份
+  auto-backup: ${AUTO_BACKUP:true}
+  # 自动备份时间（Cron表达式，默认每天凌晨2点）
+  cron: ${BACKUP_CRON:0 0 2 * * ?}
+  # 备份保留天数
+  retain-days: 30
+  # 备份类型（FULL/INCREMENTAL/DIFFERENTIAL）
+  default-type: ${BACKUP_TYPE:FULL}
+
+# ==================== 本地缓存配置 ====================
+# 本地缓存配置
+local-cache:
+  # 是否启用本地缓存
+  enabled: ${LOCAL_CACHE_ENABLED:true}
+  # 缓存数据保留天数
+  retain-days: 30
+  # 同步间隔（秒）
+  sync-interval: 60
+  # 最大重试次数
+  max-retry-count: 5
+  # 同步失败重试间隔（秒）
+  retry-interval: 600
+
+# ==================== 线程池配置 ====================
+# 异步任务线程池配置
+async-task:
+  thread-pool:
+    core-size: 10
+    max-size: 20
+    queue-capacity: 200
+    keep-alive-seconds: 60
+
+# 监控数据采集线程池配置
+monitor-task:
+  thread-pool:
+    core-size: 20
+    max-size: 50
+    queue-capacity: 500
+    keep-alive-seconds: 60
+
+# 工单处理线程池配置
+workorder-task:
+  thread-pool:
+    core-size: 10
+    max-size: 20
+    queue-capacity: 300
+    keep-alive-seconds: 60
+
+# 备份任务线程池配置
+backup-task:
+  thread-pool:
+    core-size: 2
+    max-size: 5
+    queue-capacity: 10
+    keep-alive-seconds: 60
+
+# 健康检查线程池配置
+healthcheck-task:
+  thread-pool:
+    core-size: 5
+    max-size: 10
+    queue-capacity: 50
+    keep-alive-seconds: 60
+
+# ==================== Spring Boot Actuator配置 ====================
+management:
+  endpoints:
+    web:
+      exposure:
+        # 暴露所有监控端点
+        include: '*'
+  endpoint:
+    health:
+      # 显示详细健康信息
+      show-details: always
+      show-components: always
+    metrics:
+      enabled: true
+  health:
+    defaults:
+      enabled: true
+    redis:
+      enabled: true
+    db:
+      enabled: true
+    diskspace:
+      enabled: true
+
   # 是否记录响应结果
   log-result: false
 
