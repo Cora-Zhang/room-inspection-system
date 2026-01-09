@@ -1,17 +1,27 @@
-node_modules
-dist
-.DS_Store
-*.swp
-.git/*
-__pycache__/
-*.pyc
-.venv/*
-*.o
-*.a
-/vendor
-*.egg-info/
-/.env
-.env
+# Logs
+output.log
+*.log
+*.log.*
+logs/
+
+# Java
+target/
+*.class
+*.jar
+*.war
+*.ear
+.mvn/
+mvnw
+mvnw.cmd
+
+# Maven
+.mvn/
+mvnDebug.log
+
+# Build outputs
+dist/
+build/
+out/
 
 # JS/TS bundlers & build outputs
 .next
@@ -30,11 +40,27 @@ yarn.lock
 .pnp*
 .npm
 
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
 # Python tooling
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .tox/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/*
+*.o
+*.a
+/vendor
+*.egg-info/
 
 # Go tooling
 bin/
@@ -44,13 +70,89 @@ bin/
 .vscode/
 .idea/
 *.iml
+*.swp
+*.swo
+*~
 
 # OS / misc
+.DS_Store
 Thumbs.db
 ehthumbs.db
+Desktop.ini
 
-# Logs
-output.log
-*.log
-*.log.*
-logs/
+# macOS
+.AppleDouble
+.LSOverride
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Uploads and temp files
+/tmp/
+uploads/
+*.tmp
+*.bak
+*.swp
+*.swo
+
+# Backup files
+*.backup
+*.orig
+
+# SSL certificates (never commit private keys)
+*.pem
+*.key
+*.crt
+*.keystore
+*.jks
+*.p12
+
+# Docker volumes
+docker-data/
+mysql-data/
+redis-data/
+
+# Database exports
+*.sql.gz
+*.dump
+
+# Archive files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# IDE specific
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
